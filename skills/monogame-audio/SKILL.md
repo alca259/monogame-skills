@@ -1,6 +1,6 @@
 ---
 name: monogame-audio
-description: MonoGame audio implementation guide covering SoundEffect vs Song, SoundEffectInstance pooling, volume/pitch control, 3D audio, DynamicSoundEffectInstance, and memory management rules. Use this skill whenever the user asks about playing sounds, background music, audio effects, looping audio, 3D positional sound, sound pools, or any audio-related implementation in MonoGame — even if they just say "how do I play X" or "my sounds aren't working".
+description: MonoGame audio implementation guide covering SoundEffect vs Song, SoundEffectInstance pooling, volume/pitch control, 3D audio, DynamicSoundEffectInstance, WAV streaming via TitleContainer, microphone recording, and memory management rules. Use this skill whenever the user asks about playing sounds, background music, audio effects, looping audio, 3D positional sound, sound pools, microphone input, recording audio, raw WAV loading, InstancePlayLimitException, or any audio-related implementation in MonoGame — even if they just say "how do I play X", "my sounds aren't working", or "how do I use the microphone".
 ---
 
 # MonoGame Audio Implementation Guide
@@ -136,6 +136,65 @@ Never dispose a `SoundEffectInstance` while it is playing — call `Stop()` firs
 - Do not allocate `AudioListener` or `AudioEmitter` per frame — they are class fields.
 - On mobile, test with the 32-voice limit in mind — desktop limits do not apply.
 
+## Loading Raw WAV via TitleContainer
+
+Use `TitleContainer.OpenStream` when you need the raw PCM bytes (e.g. for `DynamicSoundEffectInstance` or procedural audio). In MGCB, set the file's **Build Action to `Copy`** (not the default `Compress`), otherwise the pipeline encodes the file and the raw header won't be readable.
+
+```csharp
+using Stream wavStream = TitleContainer.OpenStream(@"Content\MySound.wav");
+SoundEffect sfx = SoundEffect.FromStream(wavStream);
+```
+
+For streaming with `DynamicSoundEffectInstance`, parse the WAV header manually to extract `sampleRate` and `channels` before constructing the instance — see `references/audio.md`.
+
+## Microphone Recording
+
+Only available on **OpenAL platforms**: DesktopGL, iOS, Android. Not available on DirectX/Windows.
+
+```csharp
+// Fields:
+private Microphone _mic;
+private byte[] _micBuffer;
+private DynamicSoundEffectInstance _playback;
+
+// Init (call once — e.g. LoadContent or first Update):
+_mic = Microphone.Default;
+if (_mic != null)
+{
+    _mic.BufferDuration = TimeSpan.FromMilliseconds(100);
+    _micBuffer = new byte[_mic.GetSampleSizeInBytes(_mic.BufferDuration)];
+    _mic.BufferReady += OnMicBufferReady;
+
+    _playback = new DynamicSoundEffectInstance(_mic.SampleRate, AudioChannels.Mono);
+}
+
+// Start / stop:
+_mic?.Start();
+_mic?.Stop();
+
+// BufferReady handler — called on the audio thread:
+private void OnMicBufferReady(object sender, EventArgs e)
+{
+    try
+    {
+        int size = _mic.GetData(_micBuffer);
+        _playback.SubmitBuffer(_micBuffer, 0, size); // echo to speakers
+        _playback.Play();
+    }
+    catch (NoMicrophoneConnectedException) { }
+}
+```
+
+Always guard with `Microphone.Default != null` — the device may have no microphone. Catch `NoMicrophoneConnectedException` in both `Start`/`Stop` and `GetData` — the mic can be disconnected mid-session.
+
+## Voice Limit and InstancePlayLimitException
+
+- Desktop: ~256 simultaneous voices. Mobile: ~32.
+- `SoundEffect.Play()` (fire-and-forget) returns `false` silently when the limit is reached.
+- Creating a `SoundEffectInstance` and calling `Play()` on it **throws `InstancePlayLimitException`** when the limit is exceeded. Pool instances to avoid this.
+- `DynamicSoundEffectInstance` counts against the voice limit.
+- `Song`/`MediaPlayer` is independent of the voice count.
+
 ## Reference
 
-For `DynamicSoundEffectInstance` (WAV streaming, microphone), see `references/audio.md`.
+For full API signatures, WAV streaming, and microphone patterns, see `references/audio.md`.

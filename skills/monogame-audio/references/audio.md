@@ -5,9 +5,11 @@
 2. [SoundEffectInstance — controlled playback](#soundeffectinstance--controlled-playback)
 3. [Song + MediaPlayer — background music](#song--mediaplayer--background-music)
 4. [DynamicSoundEffectInstance — streaming / procedural](#dynamicsoundeffectinstance--streaming--procedural)
-5. [3D Audio — AudioListener + AudioEmitter](#3d-audio--audiolistener--audioemitter)
-6. [Sound pooling pattern](#sound-pooling-pattern)
-7. [Platform limits and constraints](#platform-limits-and-constraints)
+5. [WAV streaming via TitleContainer](#wav-streaming-via-titlecontainer)
+6. [3D Audio — AudioListener + AudioEmitter](#3d-audio--audiolistener--audioemitter)
+7. [Sound pooling pattern](#sound-pooling-pattern)
+8. [Microphone recording](#microphone-recording)
+9. [Platform limits and constraints](#platform-limits-and-constraints)
 
 ---
 
@@ -144,6 +146,63 @@ Buffer format: PCM wave, 16-bit samples, 8–48 kHz, mono or stereo.
 
 ---
 
+## WAV streaming via TitleContainer
+
+Use this pattern when you need raw PCM data for `DynamicSoundEffectInstance` or procedural audio. In MGCB, set the WAV file's **Build Action to `Copy`** (not Compress).
+
+```csharp
+// In LoadContent():
+DynamicSoundEffectInstance _dynamicSound;
+byte[] _wavData;
+int    _wavPosition;
+int    _chunkSize;
+
+using System.IO.Stream waveStream = TitleContainer.OpenStream(@"Content\rock_loop_mono.wav");
+using var reader = new BinaryReader(waveStream);
+
+// Parse WAV RIFF header:
+reader.ReadInt32();  // chunkID   "RIFF"
+reader.ReadInt32();  // fileSize
+reader.ReadInt32();  // riffType  "WAVE"
+reader.ReadInt32();  // fmtID     "fmt "
+int fmtSize     = reader.ReadInt32();
+reader.ReadInt16();  // fmtCode   PCM = 1
+int channels    = reader.ReadInt16();
+int sampleRate  = reader.ReadInt32();
+reader.ReadInt32();  // fmtAvgBPS
+reader.ReadInt16();  // fmtBlockAlign
+reader.ReadInt16();  // bitDepth
+
+if (fmtSize == 18)
+{
+    int extraSize = reader.ReadInt16();
+    reader.ReadBytes(extraSize);
+}
+
+reader.ReadInt32();  // dataID  "data"
+int dataSize = reader.ReadInt32();
+_wavData = reader.ReadBytes(dataSize);
+
+_dynamicSound = new DynamicSoundEffectInstance(sampleRate, (AudioChannels)channels);
+_chunkSize    = _dynamicSound.GetSampleSizeInBytes(TimeSpan.FromMilliseconds(100));
+_dynamicSound.BufferNeeded += OnBufferNeeded;
+_dynamicSound.Play();
+
+// BufferNeeded handler (submit 2 × half-chunks per call for smooth streaming):
+private void OnBufferNeeded(object sender, EventArgs e)
+{
+    _dynamicSound.SubmitBuffer(_wavData, _wavPosition,             _chunkSize / 2);
+    _dynamicSound.SubmitBuffer(_wavData, _wavPosition + _chunkSize / 2, _chunkSize / 2);
+    _wavPosition += _chunkSize;
+    if (_wavPosition + _chunkSize > _wavData.Length)
+        _wavPosition = 0; // loop
+}
+```
+
+PCM format constraints: 16-bit samples, 8–48 kHz, mono or stereo, little-endian interleaved.
+
+---
+
 ## 3D Audio — AudioListener + AudioEmitter
 
 ```csharp
@@ -193,6 +252,72 @@ private void PlayGunshot(float pitch = 0f)
 
 ---
 
+## Microphone recording
+
+Only available on **OpenAL platforms**: DesktopGL, iOS, Android. Not available on DirectX/Windows DirectX backend.
+
+```csharp
+// Fields:
+private Microphone                _mic;
+private byte[]                    _micBuffer;
+private DynamicSoundEffectInstance _playback;
+
+// Initialization (once, guard for null):
+_mic = Microphone.Default;
+if (_mic != null)
+{
+    _mic.BufferDuration = TimeSpan.FromMilliseconds(100);
+    _micBuffer          = new byte[_mic.GetSampleSizeInBytes(_mic.BufferDuration)];
+    _mic.BufferReady   += OnMicBufferReady;
+
+    // For echo/playback — same sample rate as mic:
+    _playback = new DynamicSoundEffectInstance(_mic.SampleRate, AudioChannels.Mono);
+}
+
+// Start / Stop recording:
+private void StartRecording()
+{
+    if (_mic == null) return;
+    try { _mic.Start(); }
+    catch (NoMicrophoneConnectedException) { }
+}
+
+private void StopRecording()
+{
+    if (_mic == null) return;
+    try { _mic.Stop(); }
+    catch (NoMicrophoneConnectedException) { }
+}
+
+// BufferReady handler — echoes mic audio to speakers:
+private void OnMicBufferReady(object sender, EventArgs e)
+{
+    try
+    {
+        int size = _mic.GetData(_micBuffer);
+        _playback.SubmitBuffer(_micBuffer, 0, size);
+        _playback.Play();
+    }
+    catch (NoMicrophoneConnectedException) { }
+}
+```
+
+Key API:
+
+| Member | Description |
+|--------|-------------|
+| `Microphone.Default` | Returns the default mic, or `null` if none connected |
+| `Microphone.All` | `ReadOnlyCollection<Microphone>` of all connected mics |
+| `mic.SampleRate` | Sample rate of captured audio (read-only) |
+| `mic.BufferDuration` | Size of capture buffer (TimeSpan, min 100 ms) |
+| `mic.GetSampleSizeInBytes(duration)` | Bytes needed for a given capture duration |
+| `mic.GetData(byte[])` | Copies captured PCM into buffer, returns bytes written |
+| `mic.Start()` / `mic.Stop()` | Begin / end capture |
+| `mic.BufferReady` | Event raised when capture buffer is full |
+| `mic.State` | `MicrophoneState.Started` / `Stopped` |
+
+---
+
 ## Platform limits and constraints
 
 | Platform | Max simultaneous voices |
@@ -200,7 +325,8 @@ private void PlayGunshot(float pitch = 0f)
 | Desktop (Windows/Linux/macOS) | ~256 |
 | Mobile (iOS/Android) | ~32 |
 
-- Exceeding the limit causes `SoundEffect.Play()` to return `false` (silent fail — no exception).
-- `Song` / `MediaPlayer` is independent of the voice count.
+- `SoundEffect.Play()` (fire-and-forget) returns `false` silently when the limit is reached — no exception.
+- `SoundEffectInstance.Play()` **throws `InstancePlayLimitException`** when the limit is exceeded — pool instances to avoid this.
 - `DynamicSoundEffectInstance` counts against the voice limit.
+- `Song` / `MediaPlayer` is independent of the voice count.
 - `Apply3D` requires mono source audio for correct spatialization on all platforms.

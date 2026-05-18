@@ -3,13 +3,19 @@
 ## Table of Contents
 1. [ContentManager API](#contentmanager-api)
 2. [Built-in asset types and load paths](#built-in-asset-types-and-load-paths)
-3. [Multiple ContentManagers (per-scene scoping)](#multiple-contentmanagers-per-scene-scoping)
-4. [SpriteFont .spritefont schema](#spritefont-spritefont-schema)
-5. [Custom XML data (IntermediateSerializer)](#custom-xml-data-intermediateserializer)
-6. [Custom Processor scaffold](#custom-processor-scaffold)
-7. [Extending a built-in processor](#extending-a-built-in-processor)
-8. [Loading content in a Game Library](#loading-content-in-a-game-library)
-9. [Android texture compression](#android-texture-compression)
+3. [Standard processor parameters](#standard-processor-parameters)
+4. [Multiple ContentManagers (per-scene scoping)](#multiple-contentmanagers-per-scene-scoping)
+5. [SpriteFont .spritefont schema](#spritefont-spritefont-schema)
+6. [Custom XML data (IntermediateSerializer)](#custom-xml-data-intermediateserializer)
+7. [XnaContent XML elements](#xnacontent-xml-elements)
+8. [Custom Processor scaffold](#custom-processor-scaffold)
+9. [Custom processor parameters](#custom-processor-parameters)
+10. [context.AddDependency pattern](#contextadddependency-pattern)
+11. [Extending a built-in processor](#extending-a-built-in-processor)
+12. [Extending the font processor](#extending-the-font-processor)
+13. [Loading content in a Game Library](#loading-content-in-a-game-library)
+14. [Android texture compression](#android-texture-compression)
+15. [Android Asset Packs](#android-asset-packs)
 
 ---
 
@@ -59,6 +65,44 @@ Path rules:
 | `Effect` | Effect - MonoGame | `.fx` (HLSL) |
 | `Model` | Model - MonoGame | FBX, OBJ |
 | Custom type | Xml Importer - MonoGame | `.xml` (IntermediateSerializer) |
+
+---
+
+## Standard processor parameters
+
+Set in MGCB Editor Properties panel, or in `.mgcb` with `/processorParam:Name=Value`.
+
+### TextureProcessor
+
+| Parameter | Type | Default | Notes |
+|-----------|------|---------|-------|
+| `TextureFormat` | enum | `Color` | `Color` (uncompressed RGBA), `Compressed` (platform best), `DxtCompressed`, `PvrCompressed`, `AstcCompressed`, `Etc1Compressed`, `EtcCompressed` |
+| `GenerateMipmaps` | bool | `false` | Set `true` for 3D/world textures |
+| `ResizeToPowerOfTwo` | bool | `false` | Required for PVRTC; recommended for all mobile |
+| `MakeSquare` | bool | `false` | Force square — required for some PVRTC implementations |
+| `ColorKeyEnabled` | bool | `true` | Replace `ColorKeyColor` pixels with transparent |
+| `ColorKeyColor` | Color | `255,0,255,255` | Magenta by default |
+| `PremultiplyAlpha` | bool | `true` | Leave `true` unless using custom alpha blending |
+
+### ModelProcessor
+
+| Parameter | Type | Default | Notes |
+|-----------|------|---------|-------|
+| `Scale` | float | `1.0` | Build-time scale multiplier |
+| `SwapWindingOrder` | bool | `false` | Fix inside-out models |
+| `GenerateTangentFrames` | bool | `false` | Required for normal-map shaders |
+| `GenerateMipmaps` | bool | `false` | Apply mipmaps to embedded textures |
+| `TextureFormat` | enum | `Compressed` | Same options as TextureProcessor |
+| `XAxisRotation` / `YAxisRotation` / `ZAxisRotation` | float | `0` | Bake rotation into asset |
+
+### FontDescriptionProcessor
+
+| Parameter | Type | Default |
+|-----------|------|---------|
+| `PremultiplyAlpha` | bool | `true` |
+| `TextureFormat` | enum | `Compressed` |
+
+> Changing a processor in MGCB resets **all** parameter values to defaults. Note your custom values first.
 
 ---
 
@@ -180,6 +224,54 @@ EnemyData enemy = Content.Load<EnemyData>("Data/EnemyConfig");
 
 ---
 
+## XnaContent XML elements
+
+Elements recognized by `XmlImporter` (used for any `.xml` content file in MGCB):
+
+| Element | Parent | Description |
+|---------|--------|-------------|
+| `<XnaContent>` | — | Root tag |
+| `<Asset Type="Namespace.ClassName">` | `<XnaContent>` | Declares the target C# type. Use `ClassName[]` for arrays. |
+| `<Item>` | `<Asset>` | One object in an array. Child elements map to public fields/properties. |
+| Individual field elements | `<Asset>` or `<Item>` | Each public field/property becomes a child element. |
+
+`IntermediateSerializer` serialization rules:
+- Public fields and properties only; protected/private/internal are skipped
+- Get-only or set-only properties are skipped
+- Properties before fields; both in declaration order
+- Nested types → nested elements; base class members before derived
+
+Single-object XML example:
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<XnaContent>
+  <Asset Type="MyGame.LevelData">
+    <Name>Level 1</Name>
+    <Width>20</Width>
+    <Height>15</Height>
+  </Asset>
+</XnaContent>
+```
+
+Array XML example:
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<XnaContent>
+  <Asset Type="MyGame.EnemyData[]">
+    <Item>
+      <Name>Goblin</Name>
+      <Health>30</Health>
+    </Item>
+    <Item>
+      <Name>Troll</Name>
+      <Health>120</Health>
+    </Item>
+  </Asset>
+</XnaContent>
+```
+
+---
+
 ## Custom Processor scaffold
 
 Create a **separate Class Library** project (e.g., `MyGame.Pipeline`):
@@ -229,6 +321,82 @@ public class TilemapWriter : ContentTypeWriter<TilemapData>
 
 Reference the compiled `.dll` in the MGCB file under **References**.
 
+> **MGCB .NET constraint:** Extension libraries must target `.NET 8` or lower. `.NET 9+` assemblies are not loadable by the MGCB tool — the processor will silently not appear.
+
+---
+
+## Custom processor parameters
+
+Expose configurable parameters that appear in the MGCB Editor Properties panel:
+
+```csharp
+using System.ComponentModel;
+
+[ContentProcessor(DisplayName = "My Custom Processor")]
+public class MyProcessor : ContentProcessor<string, MyOutputData>
+{
+    // Supported parameter types: bool, byte, char, decimal, double, float,
+    // int, string, enum, Vector2/3/4, Color — others are ignored.
+
+    [DefaultValue(1.0f)]
+    [DisplayName("Scale Factor")]
+    [Description("Multiplied against all sizes at build time.")]
+    public float ScaleFactor { get; set; } = 1.0f;
+
+    [DefaultValue(false)]
+    [DisplayName("Flip Horizontal")]
+    public bool FlipHorizontal { get; set; } = false;
+
+    public override MyOutputData Process(string input, ContentProcessorContext context)
+    {
+        // use ScaleFactor and FlipHorizontal here
+        return new MyOutputData();
+    }
+}
+```
+
+### Passing parameters when chaining processors
+
+Use `OpaqueDataDictionary` to pass params to another processor:
+
+```csharp
+var parameters = new OpaqueDataDictionary
+{
+    { "ColorKeyColor",     Color.Magenta },
+    { "ColorKeyEnabled",   true },
+    { "ResizeToPowerOfTwo", true }
+};
+
+context.BuildAsset<TextureContent, TextureContent>(
+    texture,
+    typeof(TextureProcessor).Name,
+    parameters,
+    null,   // processorName override
+    null);  // assetName
+```
+
+For in-memory objects use `context.Convert<TInput, TOutput>()` instead of `BuildAsset`.
+
+---
+
+## context.AddDependency pattern
+
+Register external files your processor reads so the pipeline rebuilds when they change:
+
+```csharp
+public override MyData Process(string input, ContentProcessorContext context)
+{
+    // Always use GetFullPath so the path is absolute for the dependency tracker:
+    string configPath = Path.GetFullPath(Path.Combine(
+        Path.GetDirectoryName(context.OutputFilename), "..", "config.json"));
+
+    context.AddDependency(configPath);    // pipeline rebuild triggered if this file changes
+
+    string json = File.ReadAllText(configPath, Encoding.UTF8);
+    // ... parse and return
+}
+```
+
 ---
 
 ## Extending a built-in processor
@@ -248,6 +416,49 @@ public class ModelWithTangentsProcessor : ModelProcessor
     }
 }
 ```
+
+---
+
+## Extending the font processor
+
+For large character sets (CJK, Arabic, etc.) avoid adding huge `CharacterRegion` ranges in `.spritefont`. Instead, extend `FontDescriptionProcessor` to add only the characters actually used:
+
+```csharp
+using System.ComponentModel;
+using System.IO;
+using System.Text;
+using Microsoft.Xna.Framework.Content.Pipeline;
+using Microsoft.Xna.Framework.Content.Pipeline.Graphics;
+using Microsoft.Xna.Framework.Content.Pipeline.Processors;
+
+[ContentProcessor(DisplayName = "Font Processor - From Text File")]
+internal class TextFileFontProcessor : FontDescriptionProcessor
+{
+    [DefaultValue(@"../messages.txt")]
+    [DisplayName("Message File")]
+    [Description("Characters in this file are added to the font. Path is relative to the Content folder.")]
+    public string MessageFile { get; set; } = @"../messages.txt";
+
+    public override SpriteFontContent Process(FontDescription input, ContentProcessorContext context)
+    {
+        string fullPath = Path.GetFullPath(MessageFile);
+
+        context.AddDependency(fullPath);   // rebuild font when messages.txt changes
+
+        // FontDescription.Characters is a HashSet — duplicates are ignored automatically
+        foreach (char c in File.ReadAllText(fullPath, Encoding.UTF8))
+            input.Characters.Add(c);
+
+        return base.Process(input, context);
+    }
+}
+```
+
+Steps to activate:
+1. Build the pipeline extension project.
+2. In MGCB Editor → Content node → References → add the extension `.dll`.
+3. Select the `.spritefont` file → change its Processor to `Font Processor - From Text File`.
+4. Set `MessageFile` to the path of your text file (relative to the `.mgcb` file, so `../` = game project root).
 
 ---
 
@@ -277,23 +488,68 @@ _texture = resourceContent.Load<Texture2D>("EmbeddedTextureName");
 
 ## Android texture compression
 
-Add textures to MGCB with the appropriate processor output format:
+Set `TextureFormat` per-texture in MGCB Editor, or in the `.mgcb` file:
 
-```
-# In Content.mgcb — add a Reference to the compressor pipeline:
-/processorParam:TextureFormat=Compressed
-
-# Or per-texture in MGCB Editor:
-# Processor: Texture - MonoGame
-# Processor Parameters > Texture Format: Compressed
+```sh
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:TextureFormat=EtcCompressed
+/build:Textures/Logo.png
 ```
 
-For distribution `.aab` files with multiple compression formats, add suffixed directories:
+For `.aab` distribution, Android selects textures by directory suffix. Use the `#tcf_` prefix format in the **output path** (after the `;`):
 
-| Suffix | Format |
-|--------|--------|
-| `_etc2` | ETC2 (required, Android 4.3+) |
-| `_dxt` | S3TC/DXT (Nvidia Tegra) |
-| `_atc` | ATC (Qualcomm Adreno) |
-| `_pvrtc` | PVRTC (older PowerVR) |
-| `_astc` | ASTC (modern, best quality) |
+| `TextureProcessorOutputFormat` | Directory suffix | Supported hardware |
+|-------------------------------|-----------------|-------------------|
+| `EtcCompressed` | `#tcf_etc2` | All Android 4.3+ (safe default) |
+| `DxtCompressed` | `#tcf_s3tc` | Nvidia Tegra |
+| `AtcCompressed` | `#tcf_atc` | Qualcomm Adreno |
+| `PvrCompressed` | `#tcf_pvrtc` | PowerVR (older) — must be power-of-2 AND square |
+| `AstcCompressed` | `#tcf_astc` | Modern GPU, best quality |
+| `Compressed` or `Color` | *(no suffix)* | Fallback / uncompressed |
+
+Multi-format `.mgcb` example (build the same source into multiple output directories):
+
+```sh
+# ETC2 (default Android fallback)
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:TextureFormat=EtcCompressed
+/build:Textures/Logo.png;Textures#tcf_etc2/Logo
+
+# ASTC (modern devices)
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:TextureFormat=AstcCompressed
+/build:Textures/Logo.png;Textures#tcf_astc/Logo
+
+# S3TC/DXT (Nvidia Tegra)
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:TextureFormat=DxtCompressed
+/build:Textures/Logo.png;Textures#tcf_s3tc/Logo
+```
+
+> PVRTC requires textures to be power-of-2 **and** square (e.g. 512×512). Set `ResizeToPowerOfTwo=True` and `MakeSquare=True` in the processor params.
+
+---
+
+## Android Asset Packs
+
+For large games exceeding Play Store size limits, use Android Asset Packs (`.aab`). Add an MSBuild target to the Android `.csproj`:
+
+```xml
+<!-- In the Android .csproj — moves selected content into an Asset Pack -->
+<Target Name="_MoveContentIntoPacks" AfterTargets="IncludeContent">
+  <ItemGroup>
+    <!-- Move all music into a named pack (InstallTime by default) -->
+    <AndroidAsset Update="Content/Music/**/*.*" AssetPack="MyGameAssets" />
+    <!-- Move large textures into a separate pack -->
+    <AndroidAsset Update="Content/Textures/HighRes/**/*.*" AssetPack="MyGameHD" />
+  </ItemGroup>
+</Target>
+```
+
+- `InstallTime` packs (default) are installed with the game — no extra code needed.
+- Assets remain accessible via `Content.Load<T>()` as usual.
+- For `FastFollow` or `OnDemand` packs (downloaded after install), use the Play Asset Delivery API — out of scope for standard MonoGame usage.

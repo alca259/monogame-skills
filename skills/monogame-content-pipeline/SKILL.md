@@ -1,6 +1,6 @@
 ---
 name: monogame-content-pipeline
-description: MonoGame content pipeline implementation guide covering MGCB, ContentManager, asset loading patterns, custom processors, SpriteFont, and asset lifecycle. Use this skill whenever the user asks about loading textures, sounds, fonts, effects, or any assets; MGCB configuration; content build errors; custom importers/processors; or ContentManager usage in MonoGame — even if they just say "how do I load X" or "my content isn't loading".
+description: MonoGame content pipeline implementation guide covering MGCB, ContentManager, asset loading patterns, custom processors and parameters, SpriteFont, IntermediateSerializer XML, Android texture compression, and asset lifecycle. Use this skill whenever the user asks about loading textures, sounds, fonts, effects, or any assets; MGCB configuration; content build errors; processor parameters (GenerateMipmaps, ResizeToPowerOfTwo, Scale, etc.); custom importers/processors; ContentManager usage; Android Asset Packs; or anything related to the content pipeline in MonoGame — even if they just say "how do I load X", "my content isn't loading", or "my processor isn't showing up".
 ---
 
 # MonoGame Content Pipeline Implementation Guide
@@ -112,14 +112,32 @@ public class LevelData
 LevelData level = Content.Load<LevelData>("Levels/Level01");
 ```
 
+## Standard Processor Parameters
+
+Standard processors accept parameters you can set in the MGCB Editor properties panel or in the `.mgcb` file with `/processorParam:Name=Value`. Key parameters:
+
+| Processor | Parameter | Default | Notes |
+|-----------|-----------|---------|-------|
+| `TextureProcessor` | `TextureFormat` | `Color` | `Color`, `Compressed`, `DxtCompressed`, `PvrCompressed`, `AstcCompressed`, `Etc1Compressed`, `EtcCompressed` |
+| `TextureProcessor` | `GenerateMipmaps` | `false` | Set `true` for 3D textures |
+| `TextureProcessor` | `ResizeToPowerOfTwo` | `false` | Required for PVRTC |
+| `TextureProcessor` | `ColorKeyEnabled` | `true` | Removes magenta pixels |
+| `ModelProcessor` | `Scale` | `1.0` | Scale multiplier at build time |
+| `ModelProcessor` | `GenerateTangentFrames` | `false` | Required for normal-map shaders |
+| `ModelProcessor` | `SwapWindingOrder` | `false` | Fix inside-out models |
+| `FontDescriptionProcessor` | `PremultiplyAlpha` | `true` | Leave `true` unless using custom blending |
+
+Changing processor mid-project resets all params to defaults — note your custom values before switching.
+
 ## Custom Processor
 
-When the built-in processors don't cover your needs (e.g., a tile map format, a custom atlas packer), create a custom processor in a **separate class library project**:
+When the built-in processors don't cover your needs, create a **separate class library project** (e.g., `MyGame.Content.Pipeline`):
 
-1. Create a new project: `MyGame.Content.Pipeline` (class library).
-2. Reference `MonoGame.Framework.Content.Pipeline` NuGet.
-3. Inherit from `ContentProcessor<TInput, TOutput>`.
-4. Reference the compiled dll from the `.mgcb` file: add the path under **References**.
+1. Reference `MonoGame.Framework.Content.Pipeline` NuGet.
+2. Inherit from `ContentProcessor<TInput, TOutput>` or a built-in processor.
+3. Reference the compiled `.dll` from the MGCB Editor under **Content node → References**.
+
+> **Important .NET version constraint:** MGCB extension libraries must target **.NET 8 or lower**. The MGCB tool cannot load `.NET 9+` assemblies. This is a common build-time error — check first if a processor fails to appear.
 
 ```csharp
 [ContentProcessor(DisplayName = "My Tilemap Processor")]
@@ -132,6 +150,53 @@ public class TilemapProcessor : ContentProcessor<string, TilemapData>
 }
 ```
 
+### Processor Parameters
+
+Add configurable parameters via properties with `[DefaultValue]` / `[DisplayName]` / `[Description]` attributes — they appear in the MGCB Properties panel:
+
+```csharp
+[DefaultValue(1.0f)]
+[DisplayName("Tile Scale")]
+[Description("Scale applied to all tiles during processing.")]
+public float TileScale { get; set; } = 1.0f;
+```
+
+### Tracking External File Dependencies
+
+If your processor reads a file outside the content project (e.g., a config or text file), register it with `context.AddDependency()` so the pipeline rebuilds when it changes:
+
+```csharp
+string fullPath = Path.GetFullPath(externalFilePath);
+context.AddDependency(fullPath);
+string content = File.ReadAllText(fullPath, Encoding.UTF8);
+```
+
+### Extending the Font Processor (add characters from a text file)
+
+For CJK or other large character sets, extend `FontDescriptionProcessor` instead of adding huge `CharacterRegion` ranges in the `.spritefont`:
+
+```csharp
+[ContentProcessor(DisplayName = "Font Processor - From Text File")]
+internal class TextFileFontProcessor : FontDescriptionProcessor
+{
+    [DefaultValue("../messages.txt")]
+    [DisplayName("Message File")]
+    [Description("All characters in this file will be added to the font.")]
+    public string MessageFile { get; set; } = @"../messages.txt";
+
+    public override SpriteFontContent Process(FontDescription input, ContentProcessorContext context)
+    {
+        string fullPath = Path.GetFullPath(MessageFile);
+        context.AddDependency(fullPath);                     // rebuild if file changes
+        foreach (char c in File.ReadAllText(fullPath, Encoding.UTF8))
+            input.Characters.Add(c);                         // duplicates ignored automatically
+        return base.Process(input, context);
+    }
+}
+```
+
+In the MGCB Editor, select the `.spritefont` file and change its processor to `Font Processor - From Text File`. The path in `MessageFile` is relative to the `.mgcb` file, so use `../` to step up to the game project root.
+
 ## Rules
 
 - All `Content.Load<T>()` calls go in `LoadContent()` — no exceptions.
@@ -139,6 +204,9 @@ public class TilemapProcessor : ContentProcessor<string, TilemapData>
 - Never load the same asset twice with different `ContentManager` instances — the second load creates a duplicate in memory.
 - Add `.fx` shader files to the MGCB with the **Effect - MonoGame** processor to get the compiled `.mgfxo`.
 - On Linux/macOS, asset paths are case-sensitive — keep naming consistent with the `.mgcb` file.
+- MGCB extension libraries must target **.NET 8 or lower** — never `.NET 9+`.
+- Always call `context.AddDependency()` for any external file your processor reads — otherwise the pipeline won't rebuild on changes.
+- After changing a processor in MGCB, all parameter values reset to defaults.
 
 ## Reference
 
