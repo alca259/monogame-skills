@@ -1,11 +1,11 @@
 ---
-name: monogame-graphics
-description: MonoGame graphics implementation guide covering SpriteBatch patterns, render targets, camera systems, blend states, resolution independence, and GPU performance rules. Use this skill whenever the user asks about drawing sprites, SpriteBatch usage, rendering layers, camera 2D, post-processing, render targets, blend/sampler states, resolution scaling, or any visual rendering in MonoGame — even if they just say "how do I draw X" or "my sprites are wrong" without mentioning graphics explicitly.
+name: monogame-2d
+description: MonoGame 2D rendering guide covering SpriteBatch patterns, sprite transforms (rotation, scaling, tiling, scrolling), render targets, 2D camera, blend/sampler states, resolution independence, and GPU performance rules. Use this skill whenever the user asks about drawing sprites, SpriteBatch, 2D rendering layers, 2D camera, post-processing, render targets, tiling textures, scrolling backgrounds, sprite rotation or scaling, resolution scaling, or any 2D visual rendering in MonoGame — even if they just say "how do I draw X", "my sprites are wrong", or "how do I tile/scroll a texture".
 ---
 
-# MonoGame Graphics Implementation Guide
+# MonoGame 2D Rendering Implementation Guide
 
-This skill provides architecture rules and implementation patterns for MonoGame graphics. Apply the rules below directly when writing rendering code. For detailed API signatures and code samples, read `references/graphics.md`.
+This skill provides architecture rules and implementation patterns for MonoGame 2D graphics. Apply the rules below directly when writing rendering code. For detailed API signatures and code samples, read `references/2d.md`.
 
 ## SpriteBatch Fundamentals
 
@@ -33,20 +33,116 @@ Use the static presets — never recreate `BlendState` instances per frame:
 
 - `SamplerState.PointClamp` — nearest-neighbor filtering; **required for pixel art** to prevent blurring
 - `SamplerState.LinearClamp` — bilinear filtering for smooth high-res assets
-- `SamplerState.AnisotropicClamp` — for 3D textured surfaces at oblique angles
+- `SamplerState.LinearWrap` — bilinear filtering with texture repeat; **required for tiling**
 
 ## Sprite Layering
 
 Use `layerDepth` (0.0f = front, 1.0f = back) with `SpriteSortMode.BackToFront` to control draw order without multiple `Begin`/`End` pairs. Define layers as named constants:
 
 ```csharp
-// Define once, use everywhere — no magic numbers
 private const float LayerBackground = 1.0f;
 private const float LayerTerrain    = 0.8f;
 private const float LayerEntities   = 0.5f;
 private const float LayerEffects    = 0.3f;
 private const float LayerUI         = 0.0f;
 ```
+
+## Sprite Transforms
+
+### Rotation
+
+Set `origin` to the texture center so the sprite rotates around its own center, not its top-left corner:
+
+```csharp
+// In LoadContent — compute once:
+_origin = new Vector2(_texture.Width / 2f, _texture.Height / 2f);
+
+// In Draw:
+_spriteBatch.Draw(_texture, _position, null, Color.White,
+    _rotationAngle, _origin, 1f, SpriteEffects.None, 0f);
+```
+
+Angle is in radians, clockwise. Wrap with `rotationAngle %= MathHelper.TwoPi`.
+
+### Scaling
+
+Three methods — choose based on what you know at draw time:
+
+```csharp
+// Uniform float scale (1.0 = original size, 2.0 = double)
+_spriteBatch.Draw(_texture, _position, null, Color.White,
+    0f, Vector2.Zero, 2.0f, SpriteEffects.None, 0f);
+
+// Non-uniform Vector2 scale (independent X/Y)
+_spriteBatch.Draw(_texture, _position, null, Color.White,
+    0f, Vector2.Zero, new Vector2(2f, 0.5f), SpriteEffects.None, 0f);
+
+// Destination rectangle (stretches texture to fill exactly)
+var destRect = new Rectangle(x, y, targetWidth, targetHeight);
+_spriteBatch.Draw(_texture, destRect, Color.White);
+```
+
+### Group Rotation Around a Pivot
+
+To rotate multiple sprites as a unit around a shared point:
+
+```csharp
+// In Update — rotate all positions around 'pivot':
+static void RotateAroundPivot(Vector2 pivot, float radians, Vector2[] positions)
+{
+    Matrix rot = Matrix.CreateRotationZ(radians);
+    for (int i = 0; i < positions.Length; i++)
+        positions[i] = Vector2.Transform(positions[i] - pivot, rot) + pivot;
+}
+```
+
+Each sprite is then drawn at its rotated position with the same `rotationAngle` passed to `Draw()`. Store un-rotated positions separately and clone/recalculate each frame from the original array.
+
+## Tiling
+
+Use `SamplerState.LinearWrap` and a destination rectangle larger than the texture. The GPU tiles automatically:
+
+```csharp
+// In LoadContent:
+_tileRect = new Rectangle(0, 0,
+    _tileTexture.Width * tilesX, _tileTexture.Height * tilesY);
+
+// In Draw:
+_spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend,
+    SamplerState.LinearWrap, null, null);
+_spriteBatch.Draw(_tileTexture, Vector2.Zero, _tileRect, Color.White,
+    0f, Vector2.Zero, 1f, SpriteEffects.None, 0f);
+_spriteBatch.End();
+```
+
+For pixel-art tiles, swap `LinearWrap` for `PointWrap` to prevent bilinear blurring.
+
+## Scrolling Background
+
+Draw the texture twice to create a seamless vertical (or horizontal) scroll:
+
+```csharp
+// Fields:
+private float _scrollOffset;
+
+// In Update:
+_scrollOffset += scrollSpeed * (float)gameTime.ElapsedGameTime.TotalSeconds;
+_scrollOffset %= _bgTexture.Height;   // wrap to texture height
+
+// In Draw:
+_spriteBatch.Begin();
+// First copy — current position
+_spriteBatch.Draw(_bgTexture,
+    new Vector2(screenCenterX, _scrollOffset), null, Color.White,
+    0f, new Vector2(_bgTexture.Width / 2f, 0), 1f, SpriteEffects.None, 0f);
+// Second copy — fills the gap when first copy scrolls off screen
+_spriteBatch.Draw(_bgTexture,
+    new Vector2(screenCenterX, _scrollOffset - _bgTexture.Height), null, Color.White,
+    0f, new Vector2(_bgTexture.Width / 2f, 0), 1f, SpriteEffects.None, 0f);
+_spriteBatch.End();
+```
+
+Use a seamless/tileable texture for a continuous loop. For horizontal scroll, swap X and `Width`.
 
 ## RenderTarget2D
 
@@ -76,7 +172,7 @@ Matrix scaleMatrix = Matrix.CreateScale(scaleX, scaleY, 1f);
 _spriteBatch.Begin(transformMatrix: scaleMatrix);
 ```
 
-Never scatter screen-size conditionals across gameplay code — all positions and sizes stay in virtual space.
+Rebuild `scaleMatrix` whenever `GraphicsDeviceManager.ApplyChanges()` is called (window resize or resolution change). Never scatter screen-size conditionals across gameplay code — all positions and sizes stay in virtual space.
 
 ## Camera 2D
 
@@ -119,4 +215,4 @@ These prevent GC stalls and frame-rate stuttering:
 
 ## Reference
 
-For detailed method overloads, `Draw()` parameter descriptions, and worked examples, read `references/graphics.md`.
+For detailed method overloads, `Draw()` parameter descriptions, and worked examples, read `references/2d.md`.
