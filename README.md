@@ -1,6 +1,6 @@
 # monogame-skills
 
-An elite ecosystem of 30+ highly granular, context-optimized development blueprints designed to turn Large Language Models (LLMs) into senior .NET game engine architects. Perfect for integration with Cursor (`.cursorrules`), Cline, Roo Code, Copilot, or Claude Projects.
+An elite ecosystem of 30 highly granular, context-optimized development blueprints designed to turn Large Language Models (LLMs) into senior .NET game engine architects. Perfect for integration with Cursor (`.cursorrules`), Cline, Roo Code, Copilot, or Claude Projects.
 
 ---
 
@@ -8,7 +8,7 @@ An elite ecosystem of 30+ highly granular, context-optimized development bluepri
 
 Modern LLMs are incredible at writing C#, but they default to generic, memory-heavy Object-Oriented Programming (OOP) when asked to build game systems. They mix UI with game worlds, pollute the heap with LINQ inside the game loop, and hallucinate legacy, long-deprecated APIs.
 
-**monogame-skills** solves this. It is not a compiled library (`.dll`). It is a **context-injection matrix** built from 16 years of .NET experience. It enforces strict architectural constraints—such as Zero-Allocation game loops, clean Data-Oriented Design (DOD), and explicit rendering orders—directly into your AI's reasoning engine. 
+**monogame-skills** solves this. It is not a compiled library (`.dll`). It is a **context-injection matrix** built from years of .NET experience. It enforces strict architectural constraints—such as Zero-Allocation game loops, clean Data-Oriented Design (DOD), and explicit rendering orders—directly into your AI's reasoning engine. 
 
 By feeding these precise markdown guides to your AI agent, it will write code *exactly* like a senior software architect.
 
