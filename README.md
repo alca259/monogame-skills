@@ -51,6 +51,16 @@ Upload the `.md` files of the systems you are currently building as project know
 
 ---
 
+## 📝 A Personal Note
+
+I originally built these skills for myself — I needed an AI assistant that could help me work with MonoGame without hallucinating APIs or writing allocation-heavy code. Over time the collection grew, and I figured someone else might find it useful too.
+
+Whether you're modding an existing game, reverse-engineering how a game you like is built, or just starting out with game development and want an AI co-pilot that stays grounded in real APIs — these skills are for you.
+
+**Fair warning:** they may have mistakes or gaps. I'll keep updating them as I discover what works and what doesn't in practice. If you spot something wrong, feel free to open an issue.
+
+---
+
 ## 💝 100% Free & Open Source
 
 This project is shared with the community out of a pure love for game development and software engineering. It is **100% free**, with no paywalls, no donation links, and no monetization. 
