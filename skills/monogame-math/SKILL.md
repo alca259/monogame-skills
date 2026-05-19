@@ -212,6 +212,57 @@ PlaneIntersectionType side = plane.Intersects(box);
 
 Use `Intersects` in hot paths (per-frame collision). Use `Contains` when you need to know if an entity is fully inside a zone (e.g., trigger volumes, frustum culling with LOD).
 
+## Curve — Value Interpolation Over Time
+
+`Curve` maps a float input (time) to a float output (value) via Hermite spline. Use it for easing, non-linear property animation, or any value that needs to change over time without hardcoding every frame.
+
+```csharp
+var curve = new Curve();
+curve.Keys.Add(new CurveKey(0f,   0f));   // at t=0, value=0
+curve.Keys.Add(new CurveKey(0.5f, 1f));   // at t=0.5, value=1
+curve.Keys.Add(new CurveKey(1f,   0f));   // at t=1, value=0
+
+// Smooth tangents automatically (call after adding all keys):
+curve.ComputeTangents(CurveTangent.Smooth);
+
+// Evaluate at any time:
+float value = curve.Evaluate(t);  // t can be outside [0,1] — controlled by loop type
+```
+
+Control what happens outside the defined range with `PreLoop` / `PostLoop`:
+
+```csharp
+curve.PreLoop  = CurveLoopType.Constant;    // hold first/last value
+curve.PostLoop = CurveLoopType.Cycle;       // repeat
+curve.PostLoop = CurveLoopType.Oscillate;   // ping-pong
+curve.PostLoop = CurveLoopType.Linear;      // extrapolate linearly
+curve.PostLoop = CurveLoopType.CycleOffset; // repeat, accumulating the total delta
+```
+
+Step (discontinuous) transitions:
+
+```csharp
+// Use CurveContinuity.Step to snap instead of interpolate between two keys:
+curve.Keys.Add(new CurveKey(0.5f, 1f, 0f, 0f, CurveContinuity.Step));
+```
+
+Typical patterns:
+
+```csharp
+// Ease-in / ease-out for a move animation (0→1 over duration):
+float _elapsed;
+float _duration = 0.4f;
+
+float Progress => MathHelper.Clamp(_elapsed / _duration, 0f, 1f);
+float EasedPos  => _easeCurve.Evaluate(Progress);
+
+// Camera shake intensity that decays over 0.3 s:
+// Keys: (0, 1), (0.3, 0)  →  ComputeTangents(CurveTangent.Smooth)
+float shakeAmount = _shakeCurve.Evaluate(_shakeTimer);
+```
+
+`Curve` only interpolates **scalars**. For Vector2/Vector3 paths, use one `Curve` per component (X and Y separately).
+
 ## Rules
 
 - Use `DistanceSquared` for range/proximity checks — avoid `sqrt` in hot paths.

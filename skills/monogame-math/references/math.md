@@ -7,8 +7,9 @@
 4. [Rectangle — 2D AABB](#rectangle--2d-aabb)
 5. [Bounding volumes — 3D](#bounding-volumes--3d)
 6. [MathHelper utilities](#mathhelper-utilities)
-7. [Sprite rotation with origin](#sprite-rotation-with-origin)
-8. [Sprite scaling](#sprite-scaling)
+7. [Curve — scalar interpolation over time](#curve--scalar-interpolation-over-time)
+8. [Sprite rotation with origin](#sprite-rotation-with-origin)
+9. [Sprite scaling](#sprite-scaling)
 
 ---
 
@@ -297,6 +298,66 @@ MathHelper.Min(a, b)
 MathHelper.Max(a, b)
 MathHelper.Distance(a, b)            // |a - b|
 ```
+
+---
+
+## Curve — scalar interpolation over time
+
+```csharp
+// Build a curve with CurveKey(position/time, value):
+var curve = new Curve();
+curve.Keys.Add(new CurveKey(0f,   0f));
+curve.Keys.Add(new CurveKey(0.5f, 1f));
+curve.Keys.Add(new CurveKey(1f,   0f));
+
+// Auto-compute tangents after all keys are added:
+curve.ComputeTangents(CurveTangent.Smooth);  // options: Flat, Linear, Smooth
+
+// Evaluate (returns interpolated value at any time):
+float v = curve.Evaluate(t);
+
+// Step (discontinuous jump — no interpolation between keys):
+var key = new CurveKey(0.5f, 1f, 0f, 0f, CurveContinuity.Step);
+```
+
+### Loop types (PreLoop / PostLoop)
+
+```csharp
+curve.PreLoop  = CurveLoopType.Constant;    // hold value of first/last key
+curve.PostLoop = CurveLoopType.Cycle;       // repeat from the start
+curve.PostLoop = CurveLoopType.CycleOffset; // repeat, adding total delta each cycle
+curve.PostLoop = CurveLoopType.Oscillate;   // ping-pong (reverse each cycle)
+curve.PostLoop = CurveLoopType.Linear;      // extrapolate linearly past the endpoint
+```
+
+### CurveKey properties
+
+```csharp
+CurveKey k = curve.Keys[0];
+k.Position   // float — the time/x value
+k.Value      // float — the output/y value
+k.TangentIn  // float — incoming slope (affects interpolation from previous key)
+k.TangentOut // float — outgoing slope (affects interpolation to next key)
+k.Continuity // CurveContinuity.Smooth (default) or CurveContinuity.Step
+```
+
+### Common patterns
+
+```csharp
+// Ease-in/out lerp over a fixed duration:
+float t = MathHelper.Clamp(_elapsed / _duration, 0f, 1f);
+float easedValue = _easeCurve.Evaluate(t);
+
+// Decay curve (e.g. camera shake) — no loop needed:
+// Keys: (0f, 1f), (0.3f, 0f) → ComputeTangents(CurveTangent.Smooth)
+float shakeStrength = _shakeCurve.Evaluate(_shakeTimer);
+
+// Bouncing ball height — oscillating, defined over [0, 1]:
+curve.PostLoop = CurveLoopType.Cycle;
+float height = _bounceCurve.Evaluate(Time.Total % 1f);
+```
+
+> `Curve` is scalar only. For Vector2/3 paths, use one `Curve` per axis (X and Y separately).
 
 ---
 
