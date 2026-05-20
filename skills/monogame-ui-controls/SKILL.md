@@ -1,6 +1,6 @@
 ---
 name: monogame-ui-controls
-description: MonoGame UI component library — Label, Button (with hover animation), ProgressBar/health bar, ScrollView with scissor clipping, Panel, Sprite (texture display), and Checkbox. Use this skill whenever the user asks about specific UI components: buttons, labels, text display, health bars, progress bars, scroll views, inventory slots, dialog boxes, tooltips, panels, image/sprite in UI, checkbox, toggle, or "how do I build a [component name]" in MonoGame — even if they just say "I need a button", "how do I make a health bar", or "how do I show an image in my UI".
+description: MonoGame UI component library — Label, Button (with hover animation), ProgressBar/health bar, ScrollView with scissor clipping, Panel, Sprite (texture display), and Checkbox. Use this skill whenever the user asks about specific UI components: buttons, labels, text display, health bars, progress bars, scroll views, inventory slots, dialog boxes, tooltips, panels, image/sprite in UI, checkbox, toggle, or "how do I build a specific component" in MonoGame — even if they just say "I need a button", "how do I make a health bar", or "how do I show an image in my UI".
 ---
 
 # MonoGame UI Controls — Component Library
