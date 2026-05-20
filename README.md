@@ -37,6 +37,56 @@ Every skill folder contains a narrative instructional markdown (`SKILL.md`) unde
 | **Framework Extensions** | `extended-tweening`, `extended-bitmap-fonts`, `extended-tiled` (v6 API), `extended-particles` |
 
 ---
+## 📦 Install via skills.sh CLI
+
+[![skills.sh](https://skills.sh/b/alca259/monogame-skills)](https://skills.sh/alca259/monogame-skills)
+
+Install individual skills directly into your agent:
+
+```bash
+# Core Engine
+npx skills add alca259/monogame-skills/skills/monogame-game-loop
+npx skills add alca259/monogame-skills/skills/monogame-scenes
+npx skills add alca259/monogame-skills/skills/monogame-async
+npx skills add alca259/monogame-skills/skills/monogame-input
+npx skills add alca259/monogame-skills/skills/monogame-platform
+npx skills add alca259/monogame-skills/skills/monogame-localization
+
+# Graphics & Math
+npx skills add alca259/monogame-skills/skills/monogame-2d
+npx skills add alca259/monogame-skills/skills/monogame-3d
+npx skills add alca259/monogame-skills/skills/monogame-math
+npx skills add alca259/monogame-skills/skills/monogame-shaders
+npx skills add alca259/monogame-skills/skills/monogame-effects
+npx skills add alca259/monogame-skills/skills/monogame-camera-modes
+
+# Audio
+npx skills add alca259/monogame-skills/skills/monogame-audio
+
+# Game Architecture
+npx skills add alca259/monogame-skills/skills/monogame-ecs
+npx skills add alca259/monogame-skills/skills/monogame-content-pipeline
+
+# Custom UI Ecosystem
+npx skills add alca259/monogame-skills/skills/monogame-ui-core
+npx skills add alca259/monogame-skills/skills/monogame-ui-layout
+npx skills add alca259/monogame-skills/skills/monogame-ui-interaction
+npx skills add alca259/monogame-skills/skills/monogame-ui-focus
+npx skills add alca259/monogame-skills/skills/monogame-ui-controls
+npx skills add alca259/monogame-skills/skills/monogame-ui-slider
+npx skills add alca259/monogame-skills/skills/monogame-ui-textbox
+npx skills add alca259/monogame-skills/skills/monogame-ui-dropdown
+npx skills add alca259/monogame-skills/skills/monogame-ui-colorpicker
+npx skills add alca259/monogame-skills/skills/monogame-ui-radiobutton
+npx skills add alca259/monogame-skills/skills/monogame-ui-grid
+
+# Framework Extensions
+npx skills add alca259/monogame-skills/skills/monogame-extended-tweening
+npx skills add alca259/monogame-skills/skills/monogame-extended-bitmap-fonts
+npx skills add alca259/monogame-skills/skills/monogame-extended-tiled
+npx skills add alca259/monogame-skills/skills/monogame-extended-particles
+```
+---
 
 ## 🚀 How to Use
 
