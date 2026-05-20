@@ -1,0 +1,39 @@
+{
+  "plugins": [
+    {
+      "name": "monogame-skills",
+      "skills": [
+        "./skills/monogame-2d/SKILL.md",
+        "./skills/monogame-3d/SKILL.md",
+        "./skills/monogame-async/SKILL.md",
+        "./skills/monogame-audio/SKILL.md",
+        "./skills/monogame-camera-modes/SKILL.md",
+        "./skills/monogame-content-pipeline/SKILL.md",
+        "./skills/monogame-ecs/SKILL.md",
+        "./skills/monogame-effects/SKILL.md",
+        "./skills/monogame-extended-bitmap-fonts/SKILL.md",
+        "./skills/monogame-extended-particles/SKILL.md",
+        "./skills/monogame-extended-tiled/SKILL.md",
+        "./skills/monogame-extended-tweening/SKILL.md",
+        "./skills/monogame-game-loop/SKILL.md",
+        "./skills/monogame-input/SKILL.md",
+        "./skills/monogame-localization/SKILL.md",
+        "./skills/monogame-math/SKILL.md",
+        "./skills/monogame-platform/SKILL.md",
+        "./skills/monogame-scenes/SKILL.md",
+        "./skills/monogame-shaders/SKILL.md",
+        "./skills/monogame-ui-colorpicker/SKILL.md",
+        "./skills/monogame-ui-controls/SKILL.md",
+        "./skills/monogame-ui-core/SKILL.md",
+        "./skills/monogame-ui-dropdown/SKILL.md",
+        "./skills/monogame-ui-focus/SKILL.md",
+        "./skills/monogame-ui-grid/SKILL.md",
+        "./skills/monogame-ui-interaction/SKILL.md",
+        "./skills/monogame-ui-layout/SKILL.md",
+        "./skills/monogame-ui-radiobutton/SKILL.md",
+        "./skills/monogame-ui-slider/SKILL.md",
+        "./skills/monogame-ui-textbox/SKILL.md"
+      ]
+    }
+  ]
+}

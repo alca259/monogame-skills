@@ -1,0 +1,9 @@
+# IDE and AI tool configuration
+.claude/
+.copilot/
+.cursor/
+.aider*
+.continue/
+.codeium/
+.tabnine/
+.github/copilot*
