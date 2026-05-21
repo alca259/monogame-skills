@@ -17,8 +17,9 @@ applyTo: "**/*.cs"
   - `Microsoft.Xna.Framework.Media` Media playback for songs and videos
 
 ## 2. Performance and Memory Restrictions (Game Loop)
-- **FORBIDDEN:** Performing instantiations (`new Object()`, `new Vector2()`, etc.) inside `Update(GameTime)` or `Draw(GameTime)` methods. This generates garbage that triggers the Garbage Collector (GC) and causes stuttering.
-- **SOLUTION:** Declare control variables, intermediate position vectors, or data structures as private class fields and reuse them.
+- **FORBIDDEN (Heap Allocations):** Performing class instantiations (e.g., `new Object()`, `new List<T>()`, array creations, string concatenations, or boxing value types) inside `Update(GameTime)` or `Draw(GameTime)` methods. This generates garbage on the heap that triggers the Garbage Collector (GC) and causes stuttering.
+- **ALLOWED (Stack Allocations):** Using `new` for value types (`structs`) like `new Vector2()`, `Rectangle`, or `Color` is perfectly safe, as they allocate on the stack and do not produce GC garbage.
+- **SOLUTION:** For reference types (classes) or complex data structures, declare them as private class fields during `Initialize` or `LoadContent` and reuse/clear them each frame.
 
 ## 3. Strict Lifecycle Pattern
 Any class acting as an entity or screen manager must implement the clean interface or structure based on XNA:
