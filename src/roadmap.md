@@ -367,7 +367,7 @@ Integración en `Core.cs`: añadir `Localization` como propiedad estática.
 
 ---
 
-### Milestone 5.3 — UI Focus System
+### Milestone 5.3 — UI Focus System ✅ COMPLETADO
 
 **`UI/Focus/IFocusable.cs`** — interfaz
 - `int TabIndex { get; }` — orden de navegación Tab
