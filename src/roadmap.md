@@ -571,7 +571,7 @@ Todos los layouts heredan de `UIContainer` y overridean `Measure` y `Arrange`.
 
 > **Objetivo:** Wrappers sobre MonoGame.Extended para Tiled y BitmapFonts.
 
-### Milestone 6.1 — Tiled Map Support
+### Milestone 6.1 — Tiled Map Support ✅ COMPLETADO
 
 **`Graphics/Tiled/TiledMapRenderer.cs`** — `sealed class TiledMapRenderer : IDisposable`
 - `Load(ContentManager content, string assetName)` → carga `TiledMap` de MonoGame.Extended
