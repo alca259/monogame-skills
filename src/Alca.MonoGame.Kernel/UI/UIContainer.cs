@@ -6,6 +6,9 @@ public class UIContainer : UIElement
     /// <summary>Direct children of this container.</summary>
     protected readonly List<UIElement> Children = [];
 
+    /// <summary>Read-only view of direct children; used by UIInteractionManager for DFS traversal.</summary>
+    public IReadOnlyList<UIElement> ChildrenReadOnly => Children;
+
     /// <summary>Adds a child, sets its Parent, and invalidates layout.</summary>
     public void Add(UIElement child)
     {

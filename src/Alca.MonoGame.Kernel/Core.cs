@@ -5,6 +5,7 @@ using Alca.MonoGame.Kernel.Localization;
 using Alca.MonoGame.Kernel.Platform;
 using Alca.MonoGame.Kernel.Scenes;
 using Alca.MonoGame.Kernel.Tweening;
+using Alca.MonoGame.Kernel.UI.Interaction;
 
 namespace Alca.MonoGame.Kernel;
 
@@ -41,6 +42,8 @@ public abstract class Core : Game
     public static ResolutionManager Resolution { get; private set; } = null!;
     /// <summary>Gets the platform manager for platform detection and lifecycle events.</summary>
     public static PlatformManager Platform { get; private set; } = null!;
+    /// <summary>Gets the UI interaction manager for pointer hit testing and event dispatch.</summary>
+    public static UIInteractionManager UIInteraction { get; private set; } = null!;
     /// <summary>Gets or sets a value that indicates if the game should exit when the Escape key is pressed.</summary>
     public static bool ExitOnEscape { get; set; }
 
@@ -102,6 +105,7 @@ public abstract class Core : Game
             new ResolutionManager(sp.GetRequiredService<GraphicsDevice>(), Window));
         services.AddSingleton<PlatformManager>(sp =>
             new PlatformManager(this, sp.GetRequiredService<ResolutionManager>()));
+        services.AddSingleton<UIInteractionManager>();
 
         ConfigureServices(services);
 
@@ -117,6 +121,7 @@ public abstract class Core : Game
         Localization = _serviceProvider.GetRequiredService<LocalizationManager>();
         Resolution = _serviceProvider.GetRequiredService<ResolutionManager>();
         Platform = _serviceProvider.GetRequiredService<PlatformManager>();
+        UIInteraction = _serviceProvider.GetRequiredService<UIInteractionManager>();
 
         PostInitialize();
     }
