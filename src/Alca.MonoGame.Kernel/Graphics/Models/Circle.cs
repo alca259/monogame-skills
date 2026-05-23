@@ -1,6 +1,6 @@
 ﻿//#define DEBUG_COLLISIONS
 
-namespace MonoGameLibrary.General;
+namespace Alca.MonoGame.Kernel.Graphics.Models;
 
 /// <summary>Describes a 2D-circle.</summary>
 public readonly struct Circle : IEquatable<Circle>
@@ -73,8 +73,7 @@ public readonly struct Circle : IEquatable<Circle>
     {
 #if !DEBUG_COLLISIONS
         return;
-#endif
-
+#else
         if (IsEmpty)
             return;
 
@@ -92,12 +91,13 @@ public readonly struct Circle : IEquatable<Circle>
             Vector2 end = points[(i + 1) % segments];
             spriteBatch.DrawLine(pixel, start, end, color, thickness);
         }
+#endif
     }
 
     /// <summary>Returns a value that indicates whether this circle and the specified object are equal</summary>
     /// <param name="obj">The object to compare with this circle.</param>
     /// <returns>true if this circle and the specified object are equal; otherwise, false.</returns>
-    public override readonly bool Equals(object obj) => obj is Circle other && Equals(other);
+    public override readonly bool Equals(object? obj) => obj is Circle other && Equals(other);
 
     /// <summary>Returns a value that indicates whether this circle and the specified circle are equal.</summary>
     /// <param name="other">The circle to compare with this circle.</param>

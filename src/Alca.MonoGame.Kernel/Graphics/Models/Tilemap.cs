@@ -1,7 +1,7 @@
 ﻿using System.Xml;
 using System.Xml.Linq;
 
-namespace MonoGameLibrary.Graphics;
+namespace Alca.MonoGame.Kernel.Graphics.Models;
 
 /// <summary>This class will store which tile goes where in our game world and provide methods to draw the entire map.</summary>
 public sealed class Tilemap

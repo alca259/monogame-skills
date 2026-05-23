@@ -1,8 +1,8 @@
-﻿using MonoGameLibrary.Audio;
-using MonoGameLibrary.Input;
-using MonoGameLibrary.Scenes;
+﻿using Alca.MonoGame.Kernel.Audio;
+using Alca.MonoGame.Kernel.Input;
+using Alca.MonoGame.Kernel.Scenes;
 
-namespace MonoGameLibrary;
+namespace Alca.MonoGame.Kernel;
 
 /// <summary>Core extended Game class for MonoGame applications.</summary>
 public abstract class Core : Game

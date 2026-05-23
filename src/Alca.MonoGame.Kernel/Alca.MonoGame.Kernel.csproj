@@ -2,13 +2,14 @@
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
-  <RootNamespace>Alca.MonoGame.Kernel</RootNamespace>
-  <AssemblyName>Alca.MonoGame.Kernel</AssemblyName>
-  <PackageId>Alca.MonoGame.Kernel</PackageId>
-  <Authors>Alca</Authors>
-  <Company>Alca259</Company>
-  <Product>Alca MonoGame Framework</Product>
-</PropertyGroup>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Alca.MonoGame.Kernel</RootNamespace>
+    <AssemblyName>Alca.MonoGame.Kernel</AssemblyName>
+    <PackageId>Alca.MonoGame.Kernel</PackageId>
+    <Authors>Alca</Authors>
+    <Company>Alca259</Company>
+    <Product>Alca MonoGame Framework</Product>
+  </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.*">

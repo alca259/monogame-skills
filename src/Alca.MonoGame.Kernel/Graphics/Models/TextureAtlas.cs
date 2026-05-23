@@ -1,7 +1,8 @@
-﻿using System.Xml;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.Xml;
 using System.Xml.Linq;
 
-namespace MonoGameLibrary.Graphics;
+namespace Alca.MonoGame.Kernel.Graphics.Models;
 
 /// <summary>Represents a collection of texture regions that make up all of our sprites.</summary>
 public sealed class TextureAtlas
@@ -10,11 +11,13 @@ public sealed class TextureAtlas
     private readonly Dictionary<string, Animation> _animations = [];
 
     /// <summary>Gets or Sets the source texture represented by this texture atlas.</summary>
-    public Texture2D Texture { get; set; }
+    public required Texture2D Texture { get; set; }
 
     /// <summary>Creates a new texture atlas.</summary>
+    [SetsRequiredMembers]
     public TextureAtlas() { }
     /// <summary>Creates a new texture atlas with the specified texture.</summary>
+    [SetsRequiredMembers]
     public TextureAtlas(Texture2D texture)
     {
         Texture = texture;
@@ -104,12 +107,21 @@ public sealed class TextureAtlas
 
         using Stream stream = TitleContainer.OpenStream(filePath);
         using XmlReader reader = XmlReader.Create(stream);
-        XDocument doc = XDocument.Load(reader);
-        XElement root = doc.Root;
+        XDocument? doc = XDocument.Load(reader);
+        XElement? root = doc?.Root;
+
+        if (doc == null || root == null)
+        {
+            throw new InvalidOperationException("Failed to load the texture atlas XML file or the file is empty.");
+        }
 
         // The <Texture> element contains the content path for the Texture2D to load.
         // So we will retrieve that value then use the content manager to load the texture.
-        string texturePath = root.Element("Texture").Value;
+        string? texturePath = root?.Element("Texture")?.Value;
+        if (texturePath == null)
+        {
+            throw new InvalidOperationException("The <Texture> element is missing or empty in the texture atlas XML.");
+        }
         atlas.Texture = content.Load<Texture2D>(texturePath);
 
         // The <Regions> element contains individual <Region> elements, each one describing
@@ -123,11 +135,11 @@ public sealed class TextureAtlas
         //
         // So we retrieve all of the <Region> elements then loop through each one
         // and generate a new TextureRegion instance from it and add it to this atlas.
-        IEnumerable<XElement> regions = root.Element("Regions")?.Elements("Region") ?? [];
+        IEnumerable<XElement> regions = root!.Element("Regions")?.Elements("Region") ?? [];
 
         foreach (var region in regions)
         {
-            string name = region.Attribute("name")?.Value;
+            string? name = region.Attribute("name")?.Value;
             int x = int.Parse(region.Attribute("x")?.Value ?? "0");
             int y = int.Parse(region.Attribute("y")?.Value ?? "0");
             int width = int.Parse(region.Attribute("width")?.Value ?? "0");
@@ -156,7 +168,7 @@ public sealed class TextureAtlas
 
         foreach (var animationElement in animationElements)
         {
-            string name = animationElement.Attribute("name")?.Value;
+            string? name = animationElement.Attribute("name")?.Value;
             float delayInMilliseconds = float.Parse(animationElement.Attribute("delay")?.Value ?? "0");
             TimeSpan delay = TimeSpan.FromMilliseconds(delayInMilliseconds);
 
@@ -165,13 +177,16 @@ public sealed class TextureAtlas
             IEnumerable<XElement> frameElements = animationElement.Elements("Frame") ?? [];
             foreach (var frameElement in frameElements)
             {
-                string regionName = frameElement.Attribute("region").Value;
+                string? regionName = frameElement.Attribute("region")?.Value ?? string.Empty;
                 TextureRegion region = atlas.GetRegion(regionName);
                 frames.Add(region);
             }
 
             Animation animation = new(frames, delay);
-            atlas.AddAnimation(name, animation);
+            if (!string.IsNullOrEmpty(name))
+            {
+                atlas.AddAnimation(name, animation);
+            }
         }
 
         return atlas;

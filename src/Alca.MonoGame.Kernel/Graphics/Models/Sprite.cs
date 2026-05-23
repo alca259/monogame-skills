@@ -1,10 +1,12 @@
-﻿namespace MonoGameLibrary.Graphics;
+﻿using System.Diagnostics.CodeAnalysis;
+
+namespace Alca.MonoGame.Kernel.Graphics.Models;
 
 /// <summary>Represents a visual object created from a texture region, along with its rendering properties.</summary>
 public class Sprite
 {
     /// <summary>Gets or Sets the source texture region represented by this sprite.</summary>
-    public TextureRegion Region { get; set; }
+    public required TextureRegion Region { get; set; }
     /// <summary>Gets or Sets the color mask to apply when rendering this sprite.</summary>
     /// <remarks>Default value is Color.White</remarks>
     public Color Color { get; set; } = Color.White;
@@ -35,6 +37,7 @@ public class Sprite
 
     /// <summary>Creates a new sprite using the specified source texture region.</summary>
     /// <param name="region">The texture region to use as the source texture region for this sprite.</param>
+    [SetsRequiredMembers]
     public Sprite(TextureRegion region)
     {
         Region = region;

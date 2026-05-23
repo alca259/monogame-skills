@@ -1,4 +1,4 @@
-﻿namespace MonoGameLibrary.Input;
+﻿namespace Alca.MonoGame.Kernel.Input;
 
 public sealed class KeyboardInfo
 {

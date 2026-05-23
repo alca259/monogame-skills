@@ -1,4 +1,4 @@
-﻿namespace MonoGameLibrary.Graphics;
+﻿namespace Alca.MonoGame.Kernel.Graphics.Models;
 
 /// <summary>This class will manage a collection of tiles from a texture atlas.</summary>
 public sealed class Tileset

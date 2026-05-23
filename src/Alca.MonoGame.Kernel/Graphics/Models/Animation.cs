@@ -1,4 +1,4 @@
-﻿namespace MonoGameLibrary.Graphics;
+﻿namespace Alca.MonoGame.Kernel.Graphics.Models;
 
 /// <summary>Represents an animation consisting of multiple frames.</summary>
 /// <remarks>This class manage frame sequences and timing for animations.</remarks>

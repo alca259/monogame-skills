@@ -1,4 +1,4 @@
-﻿namespace MonoGameLibrary.Scenes;
+﻿namespace Alca.MonoGame.Kernel.Scenes;
 
 /// <summary>This is an abstract class for scenes that provides common functionality for all scenes</summary>
 public abstract class Scene : IDisposable

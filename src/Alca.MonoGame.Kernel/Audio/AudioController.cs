@@ -1,4 +1,4 @@
-﻿namespace MonoGameLibrary.Audio;
+﻿namespace Alca.MonoGame.Kernel.Audio;
 
 public sealed class AudioController : IDisposable
 {
@@ -100,8 +100,8 @@ public sealed class AudioController : IDisposable
 
     /// <summary>Plays the given song.</summary>
     /// <param name="song">The song to play.</param>
-    /// <param name="isRepeating">Optionally specify if the song should repeat.  Default is true.</param>
-    public void PlaySong(Song song, bool isRepeating = true)
+    /// <param name="isRepeating">Optionally specify if the song should repeat. Default is true.</param>
+    public static void PlaySong(Song song, bool isRepeating = true)
     {
         // Check if the media player is already playing, if so, stop it.
         // If we do not stop it, this could cause issues on some platforms
