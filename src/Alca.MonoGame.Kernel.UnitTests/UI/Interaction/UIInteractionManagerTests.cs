@@ -1,3 +1,4 @@
+using Alca.MonoGame.Kernel.Input;
 using Alca.MonoGame.Kernel.UI;
 using Alca.MonoGame.Kernel.UI.Interaction;
 
@@ -198,7 +199,7 @@ public sealed class UIInteractionManagerTests
         child.Arrange(new Rectangle(10, 10, 80, 80));
         parent.Add(child);
 
-        UIPointerEventArgs args = new UIPointerEventArgs { Position = new Point(50, 50), Button = Input.MouseButton.Left };
+        UIPointerEventArgs args = new UIPointerEventArgs { Position = new Point(50, 50), Button = MouseButton.Left };
         UIElement? current = child;
         while (current is not null && !args.Handled)
         {
@@ -219,7 +220,7 @@ public sealed class UIInteractionManagerTests
         child.Arrange(new Rectangle(10, 10, 80, 80));
         parent.Add(child);
 
-        UIPointerEventArgs args = new UIPointerEventArgs { Position = new Point(50, 50), Button = Input.MouseButton.Left };
+        UIPointerEventArgs args = new UIPointerEventArgs { Position = new Point(50, 50), Button = MouseButton.Left };
         UIElement? current = child;
         while (current is not null && !args.Handled)
         {
@@ -241,7 +242,7 @@ public sealed class UIInteractionManagerTests
         child.Arrange(new Rectangle(10, 10, 80, 80));
         parent.Add(child);
 
-        UIPointerEventArgs args = new UIPointerEventArgs { Position = new Point(50, 50), Button = Input.MouseButton.Left };
+        UIPointerEventArgs args = new UIPointerEventArgs { Position = new Point(50, 50), Button = MouseButton.Left };
         UIElement? current = child;
         while (current is not null && !args.Handled)
         {
@@ -262,7 +263,7 @@ public sealed class UIInteractionManagerTests
         child.Arrange(new Rectangle(10, 10, 80, 80));
         parent.Add(child);
 
-        UIPointerEventArgs args = new UIPointerEventArgs { Position = new Point(50, 50), Button = Input.MouseButton.Left };
+        UIPointerEventArgs args = new UIPointerEventArgs { Position = new Point(50, 50), Button = MouseButton.Left };
         UIElement? current = child;
         while (current is not null && !args.Handled)
         {
@@ -289,7 +290,7 @@ public sealed class UIInteractionManagerTests
         child.Parent = middle;
         middle.Parent = root;
 
-        UIPointerEventArgs args = new UIPointerEventArgs { Position = new Point(50, 50), Button = Input.MouseButton.Left };
+        UIPointerEventArgs args = new UIPointerEventArgs { Position = new Point(50, 50), Button = MouseButton.Left };
         UIElement? current = child;
         int interactableCallCount = 0;
         while (current is not null && !args.Handled)
@@ -316,7 +317,7 @@ public sealed class UIInteractionManagerTests
     [Fact]
     public void UIPointerEventArgs_CanSetHandled_ViaRef()
     {
-        UIPointerEventArgs args = new UIPointerEventArgs { Position = new Point(10, 20), Button = Input.MouseButton.Left };
+        UIPointerEventArgs args = new UIPointerEventArgs { Position = new Point(10, 20), Button = MouseButton.Left };
         SetHandled(ref args);
         Assert.True(args.Handled);
     }

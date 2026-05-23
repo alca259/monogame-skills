@@ -599,7 +599,7 @@ Todos los layouts heredan de `UIContainer` y overridean `Measure` y `Arrange`.
 
 ---
 
-## Milestone 6.3 — Input Manager Extendido
+## Milestone 6.3 — Input Manager Extendido ✅ COMPLETADO
 
 > Wrapper sobre el sistema de input actual del kernel, añadiendo helpers de alto nivel y soporte para input mapping configurable.
 
