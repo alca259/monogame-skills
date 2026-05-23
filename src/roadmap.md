@@ -636,7 +636,7 @@ Todos los layouts heredan de `UIContainer` y overridean `Measure` y `Arrange`.
 
 ---
 
-## Milestone 6.4 — Async Content Loading
+## Milestone 6.4 — Async Content Loading ✅ COMPLETADO
 
 > Infraestructura para carga asíncrona de assets con pantalla de carga, progreso y cancelación.
 
