@@ -36,7 +36,7 @@ public sealed class TextureAtlas
 
     /// <summary>Gets the region from this texture atlas with the specified name.</summary>
     /// <param name="name">The name of the region to retrieve.</param>
-    public TextureRegion GetRegion(string name)
+    public TextureRegion? GetRegion(string name)
         => _regions.TryGetValue(name, out TextureRegion region) ? region : null;
 
     /// <summary>Removes the region from this texture atlas with the specified name.</summary>
@@ -53,7 +53,7 @@ public sealed class TextureAtlas
     /// <returns>A new Sprite using the texture region with the specified name.</returns>
     public Sprite CreateSprite(string regionName)
     {
-        TextureRegion region = GetRegion(regionName)
+        TextureRegion? region = GetRegion(regionName)
             ?? throw new ArgumentException($"No texture region with the name '{regionName}' exists in the atlas.");
         return new Sprite(region);
     }

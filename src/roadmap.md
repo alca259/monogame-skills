@@ -14,6 +14,13 @@ El objetivo es extenderla con todos los sistemas cubiertos por las skills dispon
 - Sin `new` de clases en `Update()`/`Draw()` (structs sí)
 - XML docs en todos los miembros públicos (single-line `<summary>` si cabe)
 - `#nullable enable` asumido en todo el proyecto
+- **Se debe usar siempre Dependency Injection**. Se usará Microsoft.Extensions.DependencyInjection
+
+**Reglas transversales a todos los desarrollos:**
+- Al terminar, debe actualizarse el fichero roadmap.md, marcando que se ha hecho de los TODOs.
+- Al terminar el desarrollo de una fase, **debe** escribirse el correspondiente Test unitario con xUnit en el proyecto `src\Alca.MonoGame.Kernel.UnitTests`
+- Todos los ficheros de tests que se escriban deben estar bajo la misma nomenclatura que la carpeta origen, es decir, si un fichero de servicio/helper/otros está en `Utils/MyFileName.cs` en el proyecto de test debe estar bajo la carpeta `Utils`.
+- Para facilitar la búsqueda de tests, todos los ficheros de test deben llevar el nombre del fichero que prueban y `Tests` concatenado al final.
 
 ---
 
@@ -164,6 +171,10 @@ Añadir los siguientes paquetes:
 ## FASE 3 — Sistemas de Juego Core
 
 > **Objetivo:** Partículas, tweening, audio avanzado, ECS extendido y escenas con stack.
+
+### Milestone 3.0 - Refactoring Core.cs y Tilemap, Tileset
+- Core.cs no está preparado para DI, es necesario primero ajustarlo y también está obsoleto, seguramente necesite un refactor. En este punto se requerirá hacer un plan de refactor e incluir las decisiones tomadas en esta fase del roadmap.
+- TileMap y TileSet forman parte del sistema Xml, habrá que ver hacer un plan también para ver si se elimina en favor del sistema de tilemap/tileset que tiene MonoGame.Extended con Json.
 
 ### Milestone 3.1 — Particle System (via MonoGame.Extended.Particles)
 

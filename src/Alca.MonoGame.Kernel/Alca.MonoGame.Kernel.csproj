@@ -3,6 +3,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <RootNamespace>Alca.MonoGame.Kernel</RootNamespace>
     <AssemblyName>Alca.MonoGame.Kernel</AssemblyName>
     <PackageId>Alca.MonoGame.Kernel</PackageId>

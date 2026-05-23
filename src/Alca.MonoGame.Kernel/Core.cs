@@ -10,10 +10,10 @@ public abstract class Core : Game
     private static Core _instance;
 
     // The scene that is currently active.
-    private static Scene _activeScene;
+    private static Scene? _activeScene;
 
     // The next scene to switch to, if there is one.
-    private static Scene _nextScene;
+    private static Scene? _nextScene;
 
     /// <summary>Indicates if the game is currently in fullscreen mode.</summary>
     private bool _isFullScreen;
