@@ -1,8 +1,8 @@
-﻿using System.Diagnostics.CodeAnalysis;
+using System.Diagnostics.CodeAnalysis;
 using System.Xml;
 using System.Xml.Linq;
 
-namespace Alca.MonoGame.Kernel.Graphics.Models;
+namespace Alca.MonoGame.Kernel.Graphics.Sprites;
 
 /// <summary>Represents a collection of texture regions that make up all of our sprites.</summary>
 public sealed class TextureAtlas
@@ -125,7 +125,7 @@ public sealed class TextureAtlas
         atlas.Texture = content.Load<Texture2D>(texturePath);
 
         // The <Regions> element contains individual <Region> elements, each one describing
-        // a different texture region within the atlas.  
+        // a different texture region within the atlas.
         //
         // Example:
         // <Regions>

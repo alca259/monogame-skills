@@ -1,4 +1,4 @@
-﻿namespace Alca.MonoGame.Kernel.Graphics.Models;
+namespace Alca.MonoGame.Kernel.Graphics.Sprites;
 
 /// <summary>Represents a rectangular region within a texture.</summary>
 public sealed class TextureRegion

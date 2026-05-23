@@ -1,6 +1,6 @@
-﻿//#define DEBUG_COLLISIONS
+//#define DEBUG_COLLISIONS
 
-namespace Alca.MonoGame.Kernel.Graphics.Models;
+namespace Alca.MonoGame.Kernel.Mathematics;
 
 /// <summary>Describes a 2D-circle.</summary>
 public readonly struct Circle : IEquatable<Circle>

@@ -1,6 +1,6 @@
-﻿using System.Diagnostics.CodeAnalysis;
+using System.Diagnostics.CodeAnalysis;
 
-namespace Alca.MonoGame.Kernel.Graphics.Models;
+namespace Alca.MonoGame.Kernel.Graphics.Sprites;
 
 /// <summary>Represents a sprite that can be animated.</summary>
 public sealed class AnimatedSprite : Sprite

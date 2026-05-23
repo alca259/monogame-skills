@@ -1,6 +1,6 @@
-﻿using System.Diagnostics.CodeAnalysis;
+using System.Diagnostics.CodeAnalysis;
 
-namespace Alca.MonoGame.Kernel.Graphics.Models;
+namespace Alca.MonoGame.Kernel.Graphics.Sprites;
 
 /// <summary>Represents a visual object created from a texture region, along with its rendering properties.</summary>
 public class Sprite
