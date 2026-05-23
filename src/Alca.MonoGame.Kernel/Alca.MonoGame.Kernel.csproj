@@ -4,6 +4,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <RootNamespace>Alca.MonoGame.Kernel</RootNamespace>
     <AssemblyName>Alca.MonoGame.Kernel</AssemblyName>
     <PackageId>Alca.MonoGame.Kernel</PackageId>
