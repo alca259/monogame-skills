@@ -10,6 +10,9 @@ public abstract class Scene : IDisposable
     /// <summary>Gets a value that indicates if the scene has been disposed of.</summary>
     public bool IsDisposed { get; private set; }
 
+    /// <summary>Gets a value indicating whether this scene is an overlay; when true, the scene beneath continues drawing.</summary>
+    public virtual bool IsOverlay => false;
+
     /// <summary>Creates a new scene instance.</summary>
     public Scene()
     {
@@ -96,9 +99,9 @@ public abstract class Scene : IDisposable
     protected virtual void Dispose(bool disposing)
     {
         if (IsDisposed)
-        {
             return;
-        }
+
+        IsDisposed = true;
 
         if (disposing)
         {

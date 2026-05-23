@@ -39,7 +39,7 @@ Paquete añadido:
 
 ### Milestone 1.1 — Math Utilities ✅
 
-**`Math/MathUtils.cs`** — `static sealed class MathUtils`
+**`Mathematics/MathUtils.cs`** — `static sealed class MathUtils`
 - `DistanceSquared(Vector2 a, Vector2 b)` — evita sqrt innecesario
 - `AngleBetween(Vector2 from, Vector2 to)` — radianes
 - `AngleToVector2(float radians)` — conversión directa
@@ -49,7 +49,7 @@ Paquete añadido:
 - `SmoothStep(float a, float b, float t)` — suavizado cúbico
 - `MapRange(float value, float inMin, float inMax, float outMin, float outMax)`
 
-**`Math/BoundingHelpers.cs`** — `static sealed class BoundingHelpers`
+**`Mathematics/BoundingHelpers.cs`** — `static sealed class BoundingHelpers`
 - `CreateBoundingSphere(Vector3 center, float radius)`
 - `CreateBoundingBox(Vector3 min, Vector3 max)`
 - `RayIntersectsPlane(Ray ray, Plane plane, out float distance)`
@@ -162,7 +162,7 @@ Paquete añadido:
 
 ---
 
-## FASE 3 — Sistemas de Juego Core ✅ EN PROGRESO
+## FASE 3 — Sistemas de Juego Core ✅ COMPLETADA
 
 > **Objetivo:** Partículas, tweening, audio avanzado, ECS extendido y escenas con stack.
 
@@ -253,7 +253,7 @@ Integración en `Core.cs`: añadir `Tweening` como propiedad estática de tipo `
 
 ---
 
-### Milestone 3.4 — ECS Extendido
+### Milestone 3.4 — ECS Extendido ✅ COMPLETADO
 
 **`ECS/GameEntity.cs`** — **MODIFICAR**
 - Campo: `_tags` (HashSet<string> pre-allocated en constructor, capacidad 8)
@@ -272,7 +272,7 @@ Integración en `Core.cs`: añadir `Tweening` como propiedad estática de tipo `
 
 ---
 
-### Milestone 3.5 — Scene Stack
+### Milestone 3.5 — Scene Stack ✅ COMPLETADO
 
 **`Scenes/Scene.cs`** — **MODIFICAR**
 - Añadir `bool IsOverlay` property (default `false`) — si `true`, la escena anterior sigue dibujándose debajo
@@ -666,7 +666,7 @@ src/Alca.MonoGame.Kernel/
 ├── Localization/
 │   ├── IStringLocalizer.cs
 │   └── LocalizationManager.cs
-├── Math/
+├── Mathematics/
 │   ├── BoundingHelpers.cs
 │   └── MathUtils.cs
 ├── Platform/

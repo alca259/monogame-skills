@@ -1,14 +1,18 @@
 namespace Alca.MonoGame.Kernel.Scenes;
 
-/// <summary>Manages scene transitions with fade in/out effects.</summary>
+/// <summary>Manages scene transitions with fade in/out effects and an overlay stack.</summary>
 public sealed class SceneManager
 {
     private enum FadeState { None, FadingOut, FadingIn }
 
-    // Retained for future lifecycle hooks in Milestone 3.5
+    private const int StackCapacity = 4;
+    private const float FadeDuration = 0.3f;
+
+    // Retained for future lifecycle hooks
 #pragma warning disable IDE0052
     private readonly Game _game;
 #pragma warning restore IDE0052
+
     private Scene? _currentScene;
     private Scene? _queuedScene;
 
@@ -16,10 +20,17 @@ public sealed class SceneManager
     private float _fadeTimer;
     private float _fadeAlpha;
 
-    private const float FadeDuration = 0.3f;
+    /// <summary>Overlay stack. Last element is the top (most recently pushed).</summary>
+    private readonly Stack<Scene> _sceneStack = new(StackCapacity);
+
+    /// <summary>Pre-allocated buffer used during Draw to iterate overlays bottom-to-top without allocations.</summary>
+    private readonly Scene[] _drawBuffer = new Scene[StackCapacity];
 
     /// <summary>Gets the currently active scene.</summary>
     public Scene? CurrentScene => _currentScene;
+
+    /// <summary>Gets the number of overlay scenes currently on the stack.</summary>
+    public int OverlayCount => _sceneStack.Count;
 
     /// <summary>Exposed for unit testing only. Returns the current fade alpha value.</summary>
     internal float FadeAlpha => _fadeAlpha;
@@ -35,9 +46,12 @@ public sealed class SceneManager
         _game = null!;
     }
 
-    /// <summary>Requests a transition to the given scene with a fade effect.</summary>
+    /// <summary>Requests a full scene replacement with a fade effect. Disposes all stacked overlays.</summary>
     public void RequestChange(Scene scene)
     {
+        while (_sceneStack.Count > 0)
+            _sceneStack.Pop().Dispose();
+
         _queuedScene = scene;
         if (_fadeState == FadeState.None)
         {
@@ -46,7 +60,22 @@ public sealed class SceneManager
         }
     }
 
-    /// <summary>Updates fade state and the current scene.</summary>
+    /// <summary>Pushes an overlay scene on top of the current scene without destroying it.
+    /// The overlay is initialized immediately; no fade is applied.</summary>
+    public void PushScene(Scene overlay)
+    {
+        overlay.Initialize();
+        _sceneStack.Push(overlay);
+    }
+
+    /// <summary>Removes and disposes the topmost overlay, resuming the scene beneath.</summary>
+    public void PopScene()
+    {
+        if (_sceneStack.Count == 0) return;
+        _sceneStack.Pop().Dispose();
+    }
+
+    /// <summary>Updates fade state and the active scene (or topmost overlay when the stack is non-empty).</summary>
     public void Update(GameTime gameTime)
     {
         float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
@@ -84,13 +113,31 @@ public sealed class SceneManager
                 break;
         }
 
-        _currentScene?.Update(gameTime);
+        if (_sceneStack.Count > 0)
+            _sceneStack.Peek().Update(gameTime);
+        else
+            _currentScene?.Update(gameTime);
     }
 
-    /// <summary>Draws the current scene.</summary>
+    /// <summary>Draws the scene hierarchy.
+    /// When overlays are stacked: draws <see cref="Scene.CurrentScene"/> first (if the top overlay is an overlay scene),
+    /// then all overlays from bottom to top. Only the topmost scene receives <see cref="Update"/>.</summary>
     public void Draw(GameTime gameTime)
     {
-        _currentScene?.Draw(gameTime);
+        if (_sceneStack.Count > 0)
+        {
+            if (_sceneStack.Peek().IsOverlay)
+                _currentScene?.Draw(gameTime);
+
+            int count = _sceneStack.Count;
+            _sceneStack.CopyTo(_drawBuffer, 0); // index 0 = top, index count-1 = bottom
+            for (int i = count - 1; i >= 0; i--)
+                _drawBuffer[i].Draw(gameTime);
+        }
+        else
+        {
+            _currentScene?.Draw(gameTime);
+        }
     }
 
     /// <summary>Draws a full-screen black overlay at the current fade alpha.
@@ -113,7 +160,7 @@ public sealed class SceneManager
         SetupAndStartScene(_currentScene);
     }
 
-    private void SetupAndStartScene(Scene scene)
+    private static void SetupAndStartScene(Scene scene)
     {
         scene.Initialize();
         scene.LoadContent();
