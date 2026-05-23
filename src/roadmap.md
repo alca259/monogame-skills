@@ -286,7 +286,7 @@ Integración en `Core.cs`: añadir `Tweening` como propiedad estática de tipo `
 
 ---
 
-## FASE 4 — Infraestructura y Plataforma *(en curso)*
+## FASE 4 — Infraestructura y Plataforma ✅ COMPLETADA
 
 > **Objetivo:** Localización multi-idioma, gestión de plataforma/resolución.
 
@@ -308,7 +308,7 @@ Integración en `Core.cs`: añadir `Localization` como propiedad estática.
 
 ---
 
-### Milestone 4.2 — Platform Manager
+### Milestone 4.2 — Platform Manager ✅ COMPLETADO
 
 **`Platform/PlatformManager.cs`** — `sealed class PlatformManager`
 - `CurrentPlatform` (enum: Desktop, Mobile, Console) — detectado en constructor via `#if` y `Environment.OSVersion`

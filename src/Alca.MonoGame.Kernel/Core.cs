@@ -1,6 +1,8 @@
 using Alca.MonoGame.Kernel.Audio;
+using Alca.MonoGame.Kernel.Graphics;
 using Alca.MonoGame.Kernel.Input;
 using Alca.MonoGame.Kernel.Localization;
+using Alca.MonoGame.Kernel.Platform;
 using Alca.MonoGame.Kernel.Scenes;
 using Alca.MonoGame.Kernel.Tweening;
 
@@ -35,6 +37,10 @@ public abstract class Core : Game
     public static TweeningManager Tweening { get; private set; } = null!;
     /// <summary>Gets the localization manager for multi-language string lookup.</summary>
     public static LocalizationManager Localization { get; private set; } = null!;
+    /// <summary>Gets the resolution manager for virtual-resolution scaling and letterboxing.</summary>
+    public static ResolutionManager Resolution { get; private set; } = null!;
+    /// <summary>Gets the platform manager for platform detection and lifecycle events.</summary>
+    public static PlatformManager Platform { get; private set; } = null!;
     /// <summary>Gets or sets a value that indicates if the game should exit when the Escape key is pressed.</summary>
     public static bool ExitOnEscape { get; set; }
 
@@ -92,6 +98,10 @@ public abstract class Core : Game
         services.AddSingleton<TweeningManager>();
         services.AddSingleton<LocalizationManager>();
         services.AddSingleton<Microsoft.Extensions.Localization.IStringLocalizer>(sp => sp.GetRequiredService<LocalizationManager>());
+        services.AddSingleton<ResolutionManager>(sp =>
+            new ResolutionManager(sp.GetRequiredService<GraphicsDevice>(), Window));
+        services.AddSingleton<PlatformManager>(sp =>
+            new PlatformManager(this, sp.GetRequiredService<ResolutionManager>()));
 
         ConfigureServices(services);
 
@@ -105,6 +115,8 @@ public abstract class Core : Game
         SceneManager = _serviceProvider.GetRequiredService<SceneManager>();
         Tweening = _serviceProvider.GetRequiredService<TweeningManager>();
         Localization = _serviceProvider.GetRequiredService<LocalizationManager>();
+        Resolution = _serviceProvider.GetRequiredService<ResolutionManager>();
+        Platform = _serviceProvider.GetRequiredService<PlatformManager>();
 
         PostInitialize();
     }
