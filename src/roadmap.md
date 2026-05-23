@@ -286,11 +286,11 @@ Integración en `Core.cs`: añadir `Tweening` como propiedad estática de tipo `
 
 ---
 
-## FASE 4 — Infraestructura y Plataforma
+## FASE 4 — Infraestructura y Plataforma *(en curso)*
 
 > **Objetivo:** Localización multi-idioma, gestión de plataforma/resolución.
 
-### Milestone 4.1 — Localization
+### Milestone 4.1 — Localization ✅ COMPLETADO
 
 **`Localization/IStringLocalizer.cs`** — interfaz
 - `string this[string key] { get; }` — acceso directo
