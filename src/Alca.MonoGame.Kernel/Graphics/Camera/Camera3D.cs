@@ -3,8 +3,11 @@ namespace Alca.MonoGame.Kernel.Graphics.Camera;
 /// <summary>Abstract base for all 3D camera modes. Provides View, Projection, and frustum culling.</summary>
 public abstract class Camera3D
 {
-    private BoundingFrustum _frustum = new(Matrix.Identity);
+    private readonly BoundingFrustum _frustum = new(Matrix.Identity);
     private bool _frustumDirty = true;
+
+    /// <summary>Up vector used when building the view matrix.</summary>
+    protected Vector3 _up = Vector3.Up;
 
     /// <summary>Gets the current camera eye position in world space.</summary>
     public Vector3 Position { get; protected set; }
@@ -23,7 +26,7 @@ public abstract class Camera3D
     {
         if (_frustumDirty)
         {
-            _frustum = new BoundingFrustum(View * Projection);
+            _frustum.Matrix = View * Projection;
             _frustumDirty = false;
         }
 
@@ -33,7 +36,7 @@ public abstract class Camera3D
     /// <summary>Marks the frustum dirty so it is rebuilt on the next <see cref="GetFrustum"/> call.</summary>
     protected void InvalidateFrustum() => _frustumDirty = true;
 
-    /// <summary>Builds a View matrix from a position looking at a target. Call from subclass updates.</summary>
-    protected static Matrix BuildView(Vector3 position, Vector3 target) =>
-        Matrix.CreateLookAt(position, target, Vector3.Up);
+    /// <summary>Builds a View matrix from a position looking at a target using <see cref="_up"/>.</summary>
+    protected Matrix BuildView(Vector3 position, Vector3 target) =>
+        Matrix.CreateLookAt(position, target, _up);
 }

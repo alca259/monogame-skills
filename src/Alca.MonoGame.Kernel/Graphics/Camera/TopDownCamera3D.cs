@@ -11,7 +11,7 @@ public sealed class TopDownCamera3D : Camera3D
     public float Height
     {
         get => _height;
-        set { _height = value; RebuildView(); }
+        set { _height = value; Position = new Vector3(Position.X, _height, Position.Z); RebuildView(); }
     }
 
     /// <inheritdoc/>
