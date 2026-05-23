@@ -324,7 +324,7 @@ Integración en `Core.cs`: añadir `Localization` como propiedad estática.
 
 > **Objetivo:** UI production-ready con layout, interacción, focus y todos los controles.
 
-### Milestone 5.1 — UI Core Refactor
+### Milestone 5.1 — UI Core Refactor ✅ COMPLETADO
 
 **`UI/UIElement.cs`** — **REFACTORIZAR**
 - Añadir: `Rectangle Bounds` (posición y tamaño en screen-space)
