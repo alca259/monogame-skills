@@ -423,7 +423,7 @@ Todos los layouts heredan de `UIContainer` y overridean `Measure` y `Arrange`.
 
 ---
 
-### Milestone 5.5 — UI Overlay Manager
+### Milestone 5.5 — UI Overlay Manager ✅ COMPLETADO
 
 **`UI/UIOverlayManager.cs`** — `sealed class UIOverlayManager`
 - `_overlays` (List<UIElement> pre-allocated)

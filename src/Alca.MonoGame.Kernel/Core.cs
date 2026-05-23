@@ -5,6 +5,7 @@ using Alca.MonoGame.Kernel.Localization;
 using Alca.MonoGame.Kernel.Platform;
 using Alca.MonoGame.Kernel.Scenes;
 using Alca.MonoGame.Kernel.Tweening;
+using Alca.MonoGame.Kernel.UI;
 using Alca.MonoGame.Kernel.UI.Focus;
 using Alca.MonoGame.Kernel.UI.Interaction;
 
@@ -47,6 +48,8 @@ public abstract class Core : Game
     public static UIInteractionManager UIInteraction { get; private set; } = null!;
     /// <summary>Gets the UI focus manager for keyboard and gamepad navigation.</summary>
     public static UIFocusManager UIFocus { get; private set; } = null!;
+    /// <summary>Gets the UI overlay manager for floating elements such as dropdowns and tooltips.</summary>
+    public static UIOverlayManager UIOverlay { get; private set; } = null!;
     /// <summary>Gets or sets a value that indicates if the game should exit when the Escape key is pressed.</summary>
     public static bool ExitOnEscape { get; set; }
 
@@ -110,6 +113,7 @@ public abstract class Core : Game
             new PlatformManager(this, sp.GetRequiredService<ResolutionManager>()));
         services.AddSingleton<UIInteractionManager>();
         services.AddSingleton<UIFocusManager>();
+        services.AddSingleton<UIOverlayManager>();
 
         ConfigureServices(services);
 
@@ -127,6 +131,7 @@ public abstract class Core : Game
         Platform = _serviceProvider.GetRequiredService<PlatformManager>();
         UIInteraction = _serviceProvider.GetRequiredService<UIInteractionManager>();
         UIFocus = _serviceProvider.GetRequiredService<UIFocusManager>();
+        UIOverlay = _serviceProvider.GetRequiredService<UIOverlayManager>();
 
         PostInitialize();
     }
