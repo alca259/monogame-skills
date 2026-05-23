@@ -145,10 +145,11 @@ public sealed class PrimitiveBatch : IDisposable
             pass.Apply();
             int primitiveCount = _primitiveType switch
             {
-                PrimitiveType.LineList     => _vertexCount / 2,
-                PrimitiveType.LineStrip    => _vertexCount - 1,
-                PrimitiveType.TriangleList => _vertexCount / 3,
-                _                         => _vertexCount / 2,
+                PrimitiveType.LineList      => _vertexCount / 2,
+                PrimitiveType.LineStrip     => _vertexCount - 1,
+                PrimitiveType.TriangleList  => _vertexCount / 3,
+                PrimitiveType.TriangleStrip => _vertexCount - 2,
+                _                           => _vertexCount / 2,
             };
 
             _graphicsDevice.DrawUserPrimitives(_primitiveType, _vertices, 0, primitiveCount);
