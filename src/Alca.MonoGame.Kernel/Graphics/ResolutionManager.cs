@@ -1,9 +1,10 @@
 namespace Alca.MonoGame.Kernel.Graphics;
 
 /// <summary>Manages virtual resolution and letterboxing for resolution-independent rendering.</summary>
-public sealed class ResolutionManager
+public sealed class ResolutionManager : IDisposable
 {
     private readonly GraphicsDevice _graphicsDevice;
+    private readonly GameWindow? _window;
     private Matrix _scaleMatrix;
     private Matrix _worldScaleMatrix;
     private Viewport _letterboxViewport;
@@ -14,10 +15,16 @@ public sealed class ResolutionManager
     /// <summary>Gets the virtual design height in pixels.</summary>
     public int VirtualHeight { get; }
 
-    /// <summary>Gets the scale matrix for UI rendering. Pass to <see cref="SpriteBatch.Begin"/>.</summary>
+    /// <summary>
+    /// Gets the non-uniform scale matrix for full-screen UI rendering.
+    /// Stretches virtual space to fill the entire screen. Pass to <see cref="SpriteBatch.Begin"/>.
+    /// </summary>
     public Matrix ScaleMatrix => _scaleMatrix;
 
-    /// <summary>Gets the world scale matrix for 2D world rendering.</summary>
+    /// <summary>
+    /// Gets the uniform scale matrix for 2D world rendering with letterboxing.
+    /// Preserves the virtual aspect ratio; combine with <see cref="Camera2D.GetTransformMatrix"/>.
+    /// </summary>
     public Matrix WorldScaleMatrix => _worldScaleMatrix;
 
     /// <summary>Gets the letterboxed viewport that preserves the virtual aspect ratio.</summary>
@@ -31,6 +38,7 @@ public sealed class ResolutionManager
     public ResolutionManager(GraphicsDevice graphicsDevice, GameWindow window, int virtualWidth = 1920, int virtualHeight = 1080)
     {
         _graphicsDevice = graphicsDevice;
+        _window = window;
         VirtualWidth = virtualWidth;
         VirtualHeight = virtualHeight;
 
@@ -39,20 +47,29 @@ public sealed class ResolutionManager
         Update(_graphicsDevice.Viewport.Width, _graphicsDevice.Viewport.Height);
     }
 
+    /// <summary>Internal constructor for unit testing — skips hardware dependencies.</summary>
+    internal ResolutionManager(int virtualWidth, int virtualHeight)
+    {
+        _graphicsDevice = null!;
+        _window = null;
+        VirtualWidth = virtualWidth;
+        VirtualHeight = virtualHeight;
+    }
+
     /// <summary>Recalculates scale matrices and the letterbox viewport for the given screen dimensions.</summary>
     public void Update(int screenWidth, int screenHeight)
     {
         float scaleX = (float)screenWidth / VirtualWidth;
         float scaleY = (float)screenHeight / VirtualHeight;
-        float scale = MathF.Min(scaleX, scaleY);
+        float scale  = MathF.Min(scaleX, scaleY);
 
         int viewportWidth  = (int)(VirtualWidth  * scale);
         int viewportHeight = (int)(VirtualHeight * scale);
         int offsetX = (screenWidth  - viewportWidth)  / 2;
         int offsetY = (screenHeight - viewportHeight) / 2;
 
-        _scaleMatrix       = Matrix.CreateScale(scale, scale, 1f);
-        _worldScaleMatrix  = Matrix.CreateScale(scale, scale, 1f);
+        _scaleMatrix       = Matrix.CreateScale(scaleX, scaleY, 1f);
+        _worldScaleMatrix  = Matrix.CreateScale(scale,  scale,  1f);
         _letterboxViewport = new Viewport(offsetX, offsetY, viewportWidth, viewportHeight);
     }
 
@@ -65,6 +82,13 @@ public sealed class ResolutionManager
         return new Vector2(
             (screenPos.X - _letterboxViewport.X) / scaleX,
             (screenPos.Y - _letterboxViewport.Y) / scaleY);
+    }
+
+    /// <inheritdoc/>
+    public void Dispose()
+    {
+        if (_window is not null)
+            _window.ClientSizeChanged -= OnClientSizeChanged;
     }
 
     private void OnClientSizeChanged(object? sender, EventArgs e)
