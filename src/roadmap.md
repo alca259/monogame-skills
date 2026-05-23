@@ -387,7 +387,7 @@ Integración en `Core.cs`: añadir `Localization` como propiedad estática.
 
 ---
 
-### Milestone 5.4 — UI Layout System
+### Milestone 5.4 — UI Layout System ✅ COMPLETADO
 
 Todos los layouts heredan de `UIContainer` y overridean `Measure` y `Arrange`.  
 **Regla crítica:** Sin LINQ. Solo `for` indexado en todos los métodos de layout.
