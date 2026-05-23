@@ -1,10 +1,14 @@
 namespace Alca.MonoGame.Kernel.Scenes;
 
-public class SceneManager
+/// <summary>Manages scene transitions with fade in/out effects.</summary>
+public sealed class SceneManager
 {
     private enum FadeState { None, FadingOut, FadingIn }
 
+    // Retained for future lifecycle hooks in Milestone 3.5
+#pragma warning disable IDE0052
     private readonly Game _game;
+#pragma warning restore IDE0052
     private Scene? _currentScene;
     private Scene? _queuedScene;
 
@@ -14,19 +18,24 @@ public class SceneManager
 
     private const float FadeDuration = 0.3f;
 
+    /// <summary>Gets the currently active scene.</summary>
     public Scene? CurrentScene => _currentScene;
 
+    /// <summary>Exposed for unit testing only. Returns the current fade alpha value.</summary>
+    internal float FadeAlpha => _fadeAlpha;
+
+    /// <summary>Creates a new SceneManager bound to the given game instance.</summary>
     public SceneManager(Game game)
     {
         _game = game;
     }
 
-    // Internal constructor for unit tests — bypasses MonoGame infrastructure
     internal SceneManager()
     {
         _game = null!;
     }
 
+    /// <summary>Requests a transition to the given scene with a fade effect.</summary>
     public void RequestChange(Scene scene)
     {
         _queuedScene = scene;
@@ -37,6 +46,7 @@ public class SceneManager
         }
     }
 
+    /// <summary>Updates fade state and the current scene.</summary>
     public void Update(GameTime gameTime)
     {
         float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
@@ -61,7 +71,6 @@ public class SceneManager
                 if (_fadeTimer >= FadeDuration)
                 {
                     _fadeAlpha = 0f;
-                    // If another scene was queued during fade-in, start fading out immediately
                     if (_queuedScene != null)
                     {
                         _fadeState = FadeState.FadingOut;
@@ -78,11 +87,14 @@ public class SceneManager
         _currentScene?.Update(gameTime);
     }
 
+    /// <summary>Draws the current scene.</summary>
     public void Draw(GameTime gameTime)
     {
         _currentScene?.Draw(gameTime);
     }
 
+    /// <summary>Draws a full-screen black overlay at the current fade alpha.
+    /// Must be called explicitly by the game after base.Draw().</summary>
     public void DrawFadeOverlay(SpriteBatch spriteBatch, GraphicsDevice graphicsDevice, Texture2D texture)
     {
         if (_fadeAlpha <= 0f) return;
@@ -101,10 +113,8 @@ public class SceneManager
         SetupAndStartScene(_currentScene);
     }
 
-    protected virtual void SetupAndStartScene(Scene scene)
+    private void SetupAndStartScene(Scene scene)
     {
-        var content = new ContentManager(_game.Services, "Content");
-        //scene.Setup(content, _game.GraphicsDevice, this, _game.Window);
         scene.Initialize();
         scene.LoadContent();
     }

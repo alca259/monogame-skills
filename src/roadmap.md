@@ -162,13 +162,34 @@ Paquete añadido:
 
 ---
 
-## FASE 3 — Sistemas de Juego Core
+## FASE 3 — Sistemas de Juego Core ⬜ EN PROGRESO
 
 > **Objetivo:** Partículas, tweening, audio avanzado, ECS extendido y escenas con stack.
 
-### Milestone 3.0 - Refactoring Core.cs y Tilemap, Tileset
-- Core.cs no está preparado para DI, es necesario primero ajustarlo y también está obsoleto, seguramente necesite un refactor. En este punto se requerirá hacer un plan de refactor e incluir las decisiones tomadas en esta fase del roadmap.
-- TileMap y TileSet forman parte del sistema Xml, habrá que ver hacer un plan también para ver si se elimina en favor del sistema de tilemap/tileset que tiene MonoGame.Extended con Json.
+### Milestone 3.0 - Refactoring Core.cs y Tilemap, Tileset ✅ COMPLETADO
+
+**Decisiones tomadas:**
+
+**Core.cs — DI refactor:**
+- `Microsoft.Extensions.DependencyInjection` añadido como dependencia.
+- `ServiceCollection` se construye dentro de `Initialize()` (tras `base.Initialize()`) para que `GraphicsDevice`, `SpriteBatch` y demás objetos MonoGame estén inicializados.
+- Las propiedades estáticas se mantienen para rendimiento en el game loop (sin resolución DI en hot path); se cachean tras `BuildServiceProvider()`.
+- Hook `ConfigureServices(IServiceCollection)` virtual añadido para que subclases registren sus propios servicios.
+- Gestión de escenas duplicada eliminada: `ChangeScene()` y `TransitionScene()` eliminados. **Migration:** usar `Core.SceneManager.RequestChange(scene)`.
+- `GameGraphicsDevice` eliminado (era duplicado de `GraphicsDevice`). **Migration:** usar `Core.GraphicsDevice`.
+- `GC.Collect()` eliminado de la transición de escenas (mala práctica).
+- `SceneManager` expuesto como propiedad estática de `Core`, registrado vía DI.
+
+**SceneManager.cs — limpieza:**
+- Clase sellada (`sealed`).
+- `ContentManager` redundante eliminado de `SetupAndStartScene` (la `Scene` ya crea el suyo propio).
+- Código comentado `//scene.Setup(...)` eliminado.
+- `SetupAndStartScene` convertido a `private`.
+
+**Tilemap/Tileset — eliminados:**
+- `Graphics/Models/Tilemap.cs` y `Graphics/Models/Tileset.cs` eliminados.
+- Motivo: formato XML custom sin soporte de tooling; la alternativa estándar es el sistema Tiled (TMX/JSON) de MonoGame.Extended.
+- **Migration:** Milestone 6.1 provee `TiledMapRenderer` y `TiledObjectLayer` como sustitutos.
 
 ### Milestone 3.1 — Particle System (via MonoGame.Extended.Particles)
 
