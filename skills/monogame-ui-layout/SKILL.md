@@ -1,6 +1,6 @@
 ---
 name: monogame-ui-layout
-description: MonoGame UI layout engine — Measure & Arrange two-pass system, StackPanel, Canvas, FlowLayoutPanel, ListView (with selection), anchoring, dirty-flag invalidation, and resolution-independent UI scaling. Use this skill whenever the user asks about positioning UI elements, centering a button, building a StackPanel, FlowLayout, ListView, or grid layout, anchoring elements to screen edges, scaling UI for different resolutions, or any question about "how do I arrange/layout UI" in MonoGame — even if they just say "how do I center my health bar", "how do I flow items like CSS flexbox", "I need a selectable list", or "my UI breaks on different resolutions". For XAML-style Grid with rows and columns, see monogame-ui-grid.
+description: MonoGame UI layout engine — Measure & Arrange two-pass system, StackPanel, Canvas, FlowLayoutPanel, anchoring, dirty-flag invalidation, and resolution-independent UI scaling. Use this skill whenever the user asks about positioning UI elements, centering a button, building a StackPanel, FlowLayout, or grid layout, anchoring elements to screen edges, scaling UI for different resolutions, or any question about "how do I arrange/layout UI" in MonoGame — even if they just say "how do I center my health bar", "how do I flow items like CSS flexbox", or "my UI breaks on different resolutions". For XAML-style Grid with rows and columns, see monogame-ui-grid.
 ---
 
 # MonoGame UI Layout Engine
@@ -27,8 +27,8 @@ Invalidation  →  Measure (bottom-up)  →  Arrange (top-down)
 
 Each node asks its children how much space they need. Leaf nodes calculate their own natural size (text size, sprite size). Parent nodes sum or wrap children sizes.
 
-- Input: `available` (Point) — the space the parent is offering
-- Output: sets `DesiredSize` (Point) — how much space this node wants
+- Input: `available` (Vector2) — the space the parent is offering
+- Output: sets `DesiredSize` (Vector2) — how much space this node wants
 - Must call `Measure(available)` on all children before computing own `DesiredSize`
 
 ### Pass 2: Arrange (top-down)
@@ -46,7 +46,7 @@ The root calls `Arrange` with the full screen rectangle. Each parent assigns `Bo
 // In your root container's Update, before processing input:
 if (LayoutDirty)
 {
-    Measure(new Point(screenWidth, screenHeight));
+    Measure(new Vector2(screenWidth, screenHeight));
     Arrange(new Rectangle(0, 0, screenWidth, screenHeight));
     LayoutDirty = false;
 }
@@ -81,7 +81,7 @@ Use indexed `for` loops:
 // Correct
 int total = 0;
 for (int i = 0; i < Children.Count; i++)
-    total += Children[i].DesiredSize.X;
+    total += (int)Children[i].DesiredSize.X;
 
 // WRONG — allocates IEnumerable + enumerator
 int total = Children.Sum(c => c.DesiredSize.X);
@@ -109,7 +109,7 @@ Children on a Canvas must set their own `DesiredSize` in `Measure()`.
 
 ## Anchoring
 
-Anchors define which corner/edge of the parent a child is positioned relative to. Compute the child's position in `Arrange()` based on `AnchorPoint`:
+Anchors define which corner/edge of the parent a child is positioned relative to. Compute the child's position in `Arrange()` based on `Anchor`:
 
 | Anchor | Formula |
 |--------|---------|
@@ -121,7 +121,7 @@ Anchors define which corner/edge of the parent a child is positioned relative to
 | `TopCenter` | `(parent.Center.X - childW/2, parent.Y + offsetY)` |
 | `BottomCenter` | `(parent.Center.X - childW/2, parent.Bottom - childH - offsetY)` |
 
-Store `AnchorPoint` and `Offset` (Point) as fields on the element; apply in Arrange.
+Store `Anchor` and `Offset` (Vector2) as fields on the element; apply in Arrange.
 
 ## Resolution-Independent UI
 
@@ -164,7 +164,7 @@ On resize, destroy and re-create the menu. Acceptable for static, single-screen 
 - Never call `Measure` or `Arrange` every frame without a dirty check — expensive even if nothing changed.
 - Never read `Bounds` during `Measure` — it's stale or zero until `Arrange` completes.
 - Never use LINQ or `foreach` on `Children` inside layout methods.
-- Never allocate new structs (`new Point(...)`, `new Rectangle(...)`) inside tight layout loops — pre-compute or mutate fields.
+- Never allocate new structs (`new Vector2(...)`, `new Rectangle(...)`) inside tight layout loops — pre-compute or mutate fields.
 
 ## FlowLayoutPanel
 
@@ -184,33 +184,13 @@ flow.Add(new UIButton(...));
 // Buttons wrap automatically when the panel is too narrow.
 ```
 
-## ListView
-
-`ListView` is a vertical list of selectable items. It differs from `StackPanel` in that:
-- It tracks a `SelectedIndex` (highlighted row)
-- It fires `SelectionChanged` when the user clicks or navigates with arrow keys / D-Pad
-- It wraps a `ScrollView` to handle overflow (content taller than the visible area)
-
-**Items:** Each item is a `UIElement` (usually a `Label` or `Panel + Label`). The ListView draws a highlight rectangle behind the selected row.
-
-**Selection highlight:** Draw a `Color.CornflowerBlue * 0.4f` rectangle over `Children[SelectedIndex].Bounds` before drawing the child itself.
-
-**Keyboard / gamepad:** When focused (from `monogame-ui-focus`), Up/Down arrows change `SelectedIndex`; Enter/A confirms.
-
-```csharp
-var list = new ListView(graphicsDevice, font);
-list.AddItem("Option A");
-list.AddItem("Option B");
-list.SelectionChanged += (sender, index, text) => Console.WriteLine($"Selected: {text}");
-```
-
 ## Anti-Patterns
 
 - Never call `Measure` or `Arrange` every frame without a dirty check — expensive even if nothing changed.
 - Never read `Bounds` during `Measure` — it's stale or zero until `Arrange` completes.
 - Never use LINQ or `foreach` on `Children` inside layout methods.
-- Never allocate new structs (`new Point(...)`, `new Rectangle(...)`) inside tight layout loops — pre-compute or mutate fields.
+- Never allocate new structs (`new Vector2(...)`, `new Rectangle(...)`) inside tight layout loops — pre-compute or mutate fields.
 
 ## Reference
 
-Complete `UIElement.Layout.cs`, `StackPanel`, `Canvas`, `FlowLayoutPanel`, `ListView`, and anchor code: `references/ui-layout.md`.
+Complete `UIElement.Layout.cs`, `StackPanel`, `Canvas`, `FlowLayoutPanel`, and anchor code: `references/ui-layout.md`.

@@ -172,6 +172,53 @@ private void OnExiting(object sender, ExitingEventArgs e)
 
 > **Platform note:** `Game.Exit()` behavior varies. On Android it finishes the Activity; on iOS it is a no-op (Apple guidelines forbid forced exit). Always test on device. For mobile, prefer showing a quit-confirmation dialog over calling `Exit()` directly.
 
+## InputManager (Alca.MonoGame.Kernel)
+
+The library wraps all raw polling into `InputManager`, accessible via `Core.Input`. It handles state updates automatically — no need to store previous/current state manually.
+
+```csharp
+// InputManager is updated by Core each frame — do not call Update() yourself.
+
+// Keyboard — single-key helpers:
+bool jumped  = Core.Input.IsKeyPressed(Keys.Space);   // just pressed this frame
+bool running = Core.Input.IsKeyHeld(Keys.LeftShift);  // held
+bool dropped = Core.Input.IsKeyReleased(Keys.S);      // just released
+
+// Mouse:
+Vector2 mousePos = Core.Input.MousePosition;
+bool clicked = Core.Input.Mouse.IsLeftButtonPressed();
+
+// Gamepad (index 0–3):
+GamePadInfo pad = Core.Input.GamePads[0];
+bool aPressed = pad.IsButtonPressed(Buttons.A);
+
+// Load / unload binding maps at runtime:
+Core.Input.LoadMap(_gameplayMap);
+Core.Input.UnloadMap();
+```
+
+### InputActionMap — Configurable Bindings
+
+`InputActionMap` lets you define named actions backed by configurable `InputBinding` objects. Use this for rebindable controls.
+
+```csharp
+// Define a map (e.g. in LoadContent):
+var map = new InputActionMap("Gameplay");
+
+var jumpAction = new InputAction("Jump");
+jumpAction.AddBinding(new InputBinding(DeviceType.Keyboard, (int)Keys.Space));
+jumpAction.AddBinding(new InputBinding(DeviceType.Gamepad,  (int)Buttons.A));
+map.Add(jumpAction);
+
+Core.Input.LoadMap(map);
+
+// In Update():
+if (map["Jump"].WasPressed)
+    DoJump();
+```
+
+`InputSerializer` can save/load `InputActionMap` bindings to JSON — useful for a key-rebinding settings screen.
+
 ## Rules
 
 - Always update previous state at the **top** of `Update()`, before reading input — never at the bottom.

@@ -7,14 +7,14 @@ description: MonoGame UI Color Picker — RGB and HSV color selectors using thre
 
 A color picker lets the user select a `Color` value. Two common forms:
 
-1. **RGB Sliders** — three `UISlider` instances (R, G, B) from 0–255 plus an optional Alpha slider. Simple to implement, easy to read.
+1. **RGB Sliders** — three `Slider` instances (R, G, B) from 0–255 plus an optional Alpha slider. Simple to implement, easy to read.
 2. **HSV Picker** — a hue bar (or wheel) + saturation/value square. More ergonomic for artists but requires HSV↔RGB conversion math.
 
 For complete code templates, read `references/ui-colorpicker.md`.
 
 ## Assumed Contract
 
-`UIColorPickerRGB` is a `UIContainer` that composes three `UISlider` instances from `monogame-ui-slider`. It uses `monogame-ui-layout`'s `StackPanel` internally. The preview swatch is a `UISprite` (from `monogame-ui-controls`) tinted with the current color.
+`ColorPickerRGB` is a `UIContainer` that composes three `Slider` instances from `monogame-ui-slider`. Constructor: `ColorPickerRGB(SpriteFont? font, Texture2D? pixel)`. It uses `monogame-ui-layout`'s `StackPanel` internally. The preview swatch is rendered by tinting a 1×1 pixel texture.
 
 ## RGB Slider Picker
 
@@ -34,7 +34,7 @@ The simplest form — compose three pre-built sliders:
 
 Each slider's `ValueChanged` callback updates the combined `SelectedColor` and fires `ColorChanged`.
 
-**Hex input:** Add a `UITextBox` that accepts 6-character hex strings (`RRGGBB`). On commit (Enter or focus-lost), parse with `Convert.ToInt32(hex, 16)` and push values to the three sliders.
+**Hex input:** Add a `TextBox` that accepts 6-character hex strings (`RRGGBB`). On commit (Enter or focus-lost), parse with `Convert.ToInt32(hex, 16)` and push values to the three sliders.
 
 ## HSV Picker
 
@@ -102,15 +102,15 @@ Update `SelectedColor` whenever any slider changes. Do not create `new Color(...
 
 ## Events
 
-- `ColorChanged(UIColorPickerRGB sender, Color color)` — fires when any slider changes
-- `ColorCommitted` (optional) — fires on focus-lost or a dedicated "OK" button
+- `event Action<Color>? ColorChanged` — fires when any slider changes; receives the new color
+- `event Action<Color>? ColorCommitted` — fires on focus-lost or a dedicated "OK" button
 
 ## Anti-Patterns
 
 - Never generate the hue/saturation gradient texture inside `Draw()` — generate it once in `LoadContent()` / constructor.
 - Never store `Color` as four separate float fields and reconstruct with `new Color(...)` every `Draw()` — store the `Color` struct directly and update it only when the value changes.
-- For the RGB picker, do not re-create `UISlider` instances when the color changes externally — call `slider.Value = r/g/b` to push values in.
+- For the RGB picker, do not re-create `Slider` instances when the color changes externally — call `slider.Value = r/g/b` to push values in.
 
 ## Reference
 
-Complete `UIColorPickerRGB`, HSV picker components, and conversion utilities: `references/ui-colorpicker.md`.
+Complete `ColorPickerRGB`, HSV picker components, and conversion utilities: `references/ui-colorpicker.md`.

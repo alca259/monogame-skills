@@ -71,7 +71,7 @@ creation/destruction:
 _world.Update(gameTime);
 
 // In Game1.Draw():
-_world.Draw(_spriteBatch);
+_world.Draw(gameTime, _spriteBatch);
 ```
 
 ---
@@ -85,7 +85,7 @@ First frame → Start()          (before first Update, after all Awakes in scene
               ↓
 Every frame → Update(gt)       (only if behaviour overrides it)
               ↓
-Every frame → Draw(sb)         (only if behaviour overrides it)
+Every frame → Draw(gameTime, sb)  (only if behaviour overrides it)
               ↓
 Destroy()   → OnDestroy()      (deferred to end of frame)
 ```
@@ -97,8 +97,8 @@ Use **Start** for logic that depends on all entities/behaviours being initialize
 
 ## Domain Interfaces
 
-Define capability contracts as interfaces. Use them for queries and loose coupling —
-never for logic or inheritance chains.
+Define capability contracts as interfaces for queries and loose coupling —
+never for logic or inheritance chains. The interfaces below (`IGravity`, `ICollidable`, `IDamageable`) are **illustrative examples** — they are not part of the library. Define your own project interfaces.
 
 ```csharp
 interface IGravity    { float Scale { get; set; } }
@@ -247,7 +247,6 @@ crate — same code, no inheritance.
   treat it as dead immediately after the call.
 - Keep GameBehaviours focused: one responsibility per class. Prefer small behaviours
   composed together over large monolithic ones.
-- Domain interfaces (`IGravity`, `ICollidable`…) define *what*, not *how*. Never put
-  logic in them.
+- Domain interfaces (`IGravity`, `ICollidable`…) define *what*, not *how*. Define your own — the library does not ship these.
 - Use `entity.Active = false` to pause temporarily; use `World.Destroy()` to remove
   permanently.

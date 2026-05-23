@@ -14,19 +14,19 @@ Extends `UIElement` from `monogame-ui-core`. Receives pointer events from `monog
 ## RadioGroup
 
 `RadioGroup` is the source of truth for selection — it is not a visual element. It:
-- Holds a list of `UIRadioButton` instances belonging to it
+- Holds a list of `RadioButton` instances belonging to it
 - Tracks `SelectedButton` (the currently checked one)
 - Provides `Select(button)` which deselects all others and selects the given one
-- Fires `SelectionChanged(RadioGroup, UIRadioButton)`
+- Fires `SelectionChanged(RadioGroup, RadioButton)`
 
-**Registration:** Call `group.Register(button)` after construction, or pass the group to the button's constructor. Never manage selection state inside individual buttons — always delegate to the group.
+**Registration:** Pass the group to the button's constructor — buttons register themselves automatically. Never manage selection state inside individual buttons — always delegate to the group.
 
 ```csharp
 var group = new RadioGroup();
 
-var optA = new UIRadioButton(font, pixel, "Option A", group);
-var optB = new UIRadioButton(font, pixel, "Option B", group);
-var optC = new UIRadioButton(font, pixel, "Option C", group);
+var optA = new RadioButton(font, pixel, "Option A", group);
+var optB = new RadioButton(font, pixel, "Option B", group);
+var optC = new RadioButton(font, pixel, "Option C", group);
 
 group.SelectionChanged += (g, btn) => ApplyOption(btn.Label);
 
@@ -34,7 +34,7 @@ group.SelectionChanged += (g, btn) => ApplyOption(btn.Label);
 group.Select(optA);
 ```
 
-## UIRadioButton Anatomy
+## RadioButton Anatomy
 
 ```
 (●) Option A label     ← checked state (filled circle)
@@ -45,7 +45,7 @@ Visual: two textures (`_emptyCircle`, `_filledCircle`) drawn at the left of the 
 
 ## Keyboard Navigation Within a Group
 
-When a `UIRadioButton` is focused, Up/Down arrows should move focus to the adjacent button **and immediately select it** (standard radio button behavior):
+When a `RadioButton` is focused, Up/Down arrows should move focus to the adjacent button **and immediately select it** (standard radio button behavior):
 
 ```csharp
 public override void HandleKeyboardInput(UIKeyboardEventArgs args)
@@ -80,7 +80,7 @@ Implement by:
 
 ## Measure/Arrange
 
-`UIRadioButton.Measure`:
+`RadioButton.Measure`:
 - `DesiredSize.X` = `circleSize + spacing + labelWidth`
 - `DesiredSize.Y` = `max(circleSize, fontLineSpacing)`
 
@@ -95,4 +95,4 @@ Lay multiple radio buttons out using a `StackPanel` (vertical) from `monogame-ui
 
 ## Reference
 
-Complete `RadioGroup`, `UIRadioButton`, and tab-integration patterns: `references/ui-radiobutton.md`.
+Complete `RadioGroup`, `RadioButton`, and tab-integration patterns: `references/ui-radiobutton.md`.

@@ -5,7 +5,7 @@ description: MonoGame UI TextBox controls — plain text input, numeric (int/flo
 
 # MonoGame UI TextBox
 
-Text input controls for MonoGame. Four variants share a common base: `UITextBoxBase`. Each handles `Window.TextInput` (for correct Unicode / IME support) and maintains a cursor position. For complete code, read `references/ui-textbox.md`.
+Text input controls for MonoGame. Four variants share a common base: `TextBoxBase`. Each handles `Window.TextInput` (for correct Unicode / IME support) and maintains a cursor position. For complete code, read `references/ui-textbox.md`.
 
 ## Assumed Contract
 
@@ -21,26 +21,29 @@ Window.TextInput += OnTextInput;
 
 private void OnTextInput(object sender, TextInputEventArgs e)
 {
-    if (UIFocusManager.FocusedElement is UITextBoxBase tb)
+    if (Core.UIFocus.FocusedElement is TextBoxBase tb)
         tb.HandleTextInput(e.Character);
 }
 ```
 
 `HandleTextInput` is responsible for filtering control characters and dispatching to the correct variant's rules.
 
-## Common Base Architecture: UITextBoxBase
+## Common Base Architecture: TextBoxBase
 
 All TextBox variants share:
 - `_text` (StringBuilder) — the content buffer
-- `_cursorPos` (int) — insertion point (0 = before first char)
+- `_cursorIndex` (int) — insertion point (0 = before first char)
 - `_scrollOffset` (int) — horizontal scroll in pixels for text wider than the box
 - `IsReadOnly` — prevents editing
 - `Placeholder` — displayed when `_text` is empty, in a dimmed color
-- `MaxLength` — clamps input to N characters
+- `MaxLength` — clamps input to N characters (-1 = unlimited)
+- `Text` property — read-only string accessor (use `SetText(string)` for programmatic changes)
+- `event Action<string>? TextChanged` — fires when text changes; receives new string
 
-**Cursor blink:** A float `_cursorTimer` increments with `deltaTime` and toggles `_cursorVisible` every 0.5 s. Reset `_cursorTimer = 0` on any key press to keep the cursor visible during active typing.
+**Constructor (protected):** `TextBoxBase(SpriteFont? font, Texture2D? pixel, GameWindow? window)`
+— pass `Window` from your game to enable TextInput subscription; pass `null` in unit tests.
 
-## Variant 1: UITextBox (Plain Text)
+## Variant 1: TextBox (Plain Text)
 
 Accepts all printable characters. Handles:
 - Backspace → delete char before cursor
@@ -49,7 +52,7 @@ Accepts all printable characters. Handles:
 - Home / End → jump to start / end
 - Ctrl+A → select all (optional)
 
-## Variant 2: UINumericBox
+## Variant 2: NumericBox
 
 Filters `HandleTextInput` to allow only digits, one minus sign (at position 0), and for float: one decimal separator (`.` or `,`).
 
@@ -60,10 +63,10 @@ Properties:
 
 ```csharp
 // Integer field, range 1–99, arrow keys step by 1:
-var qty = new UINumericBox(font, pixel) { IsInt = true, MinValue = 1, MaxValue = 99, Step = 1 };
+var qty = new NumericBox(font, pixel, Window) { IsInt = true, MinValue = 1, MaxValue = 99, Step = 1 };
 
 // Float field, range 0.0–1.0, step 0.1:
-var vol = new UINumericBox(font, pixel) { MinValue = 0f, MaxValue = 1f, Step = 0.1f };
+var vol = new NumericBox(font, pixel, Window) { MinValue = 0f, MaxValue = 1f, Step = 0.1f };
 ```
 
 **Parse timing:** Parse the string to a number only in:
@@ -72,7 +75,7 @@ var vol = new UINumericBox(font, pixel) { MinValue = 0f, MaxValue = 1f, Step = 0
 
 Never parse inside `Draw()` — `float.TryParse` allocates.
 
-## Variant 3: UIPasswordBox
+## Variant 3: PasswordBox
 
 Same as plain text but `Draw()` renders bullet characters (`•`) instead of actual text. Store the real characters in `_text` as plaintext — only the rendering is masked.
 
@@ -81,7 +84,7 @@ string masked = new string('•', _text.Length);
 spriteBatch.DrawString(_font, masked, textPos, TextColor * opacity);
 ```
 
-## Variant 4: UITextArea (Multiline)
+## Variant 4: TextArea (Multiline)
 
 Extends the base with:
 - Line breaks on Enter (`\n`)
@@ -100,8 +103,8 @@ Draw a 1-px wide rectangle at the cursor's screen position, visible only when `_
 if (IsFocused && _cursorVisible)
 {
     // Measure text up to cursor to find X position
-    string textBeforeCursor = _text.ToString(0, _cursorPos);
-    Vector2 measured = _font.MeasureString(textBeforeCursor);
+    // _cachedBeforeCursor is rebuilt only when _cursorIndex changes
+    Vector2 measured = _font.MeasureString(_cachedBeforeCursor);
     int cx = textOrigin.X + (int)measured.X - _scrollOffset;
     spriteBatch.Draw(_pixel,
         new Rectangle(cx, textOrigin.Y, 1, _font.LineSpacing),
@@ -109,7 +112,7 @@ if (IsFocused && _cursorVisible)
 }
 ```
 
-Cache `textBeforeCursor` as a `string` field that is rebuilt only when `_cursorPos` changes — do not allocate it every frame.
+Cache `_cachedBeforeCursor` as a field, rebuilt only when `_cursorIndex` changes — do not allocate it every frame.
 
 ## Anti-Patterns
 
@@ -121,4 +124,4 @@ Cache `textBeforeCursor` as a `string` field that is rebuilt only when `_cursorP
 
 ## Reference
 
-Complete `UITextBoxBase`, `UITextBox`, `UINumericBox`, `UIPasswordBox`, and `UITextArea`: `references/ui-textbox.md`.
+Complete `TextBoxBase`, `TextBox`, `NumericBox`, `PasswordBox`, and `TextArea`: `references/ui-textbox.md`.

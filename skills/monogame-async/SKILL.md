@@ -117,6 +117,65 @@ _loadTask = Task.Run(async () =>
 
 Never block the main thread with `File.ReadAllText` (synchronous) for files larger than a few KB.
 
+## AsyncContentLoader (Alca.MonoGame.Kernel)
+
+The library provides `AsyncContentLoader` as a safe bridge between background loading and the main-thread GPU upload. It solves the constraint that `Content.Load<T>()` must run on the main thread.
+
+```csharp
+// Create once (e.g. in LoadingScene):
+var loader = new AsyncContentLoader();
+loader.MaxAssetsPerFrame = 2;  // throttle GPU uploads to N assets per Update tick
+
+// Schedule async loading (background thread — disk I/O + decompression):
+_ = Task.Run(async () =>
+{
+    await loader.LoadAsync<Texture2D>("Sprites/Player", progress: null, ct);
+    await loader.LoadAsync<SpriteFont>("Fonts/UI", progress: null, ct);
+});
+
+// In Update() — pumps the upload queue on the main thread:
+loader.FlushPending(Content);
+```
+
+`FlushPending(ContentManager)` **must be called every `Update()` frame** while loading — it performs the actual GPU uploads that were queued from the background thread.
+
+### ContentLoadGroup — Batch Loading
+
+Group multiple assets for structured batch loading with progress reporting:
+
+```csharp
+var group = new ContentLoadGroup();
+group.Add<Texture2D>("Sprites/Tileset");
+group.Add<Texture2D>("Sprites/Player");
+group.Add<SpriteFont>("Fonts/HUD");
+// group.Count == 3
+
+var progress = new Progress<float>(pct => _loadPct = pct);
+await group.LoadAllAsync(loader, progress, cancellationToken);
+// LoadAllAsync loads each asset sequentially and reports (completed/total) progress
+```
+
+### LoadingScene Base Class
+
+Extend `LoadingScene` for standard loading screen behavior — it handles the `AsyncContentLoader` lifecycle and transitions to the target scene on completion:
+
+```csharp
+public sealed class MyLoadingScene : LoadingScene
+{
+    protected override ContentLoadGroup BuildGroup()
+    {
+        var group = new ContentLoadGroup();
+        group.Add<Texture2D>("Sprites/World");
+        group.Add<SoundEffect>("Audio/Theme");
+        return group;
+    }
+
+    protected override Scene CreateNextScene() => new GameplayScene();
+}
+```
+
+The base `LoadingScene` calls `FlushPending(Content)` in `Update()` automatically, drives `_loadPct`, and calls `Core.SceneManager.RequestChange(CreateNextScene())` when all assets are loaded.
+
 ## Anti-Patterns to Avoid
 
 - **Never `task.Wait()` or `task.Result` on the main game thread** unless the task is already completed (`IsCompleted == true`). Blocking the main thread stalls the game loop and freezes rendering.
