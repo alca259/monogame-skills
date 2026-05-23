@@ -1,4 +1,5 @@
 using System.Linq.Expressions;
+using MonoGame.Extended;
 using MonoGame.Extended.Tweening;
 
 namespace Alca.MonoGame.Kernel.Tweening;
@@ -9,17 +10,18 @@ public sealed class TweeningManager
     private readonly Tweener _tweener = new();
 
     /// <summary>Creates a tween that animates a float property from its current value to toValue over duration seconds.</summary>
-    /// <returns>The created Tween, supporting fluent chaining (OnBegin, OnEnd, Repeat, etc.).</returns>
-    public Tween TweenTo<T>(T target, Expression<Func<T, float>> member, float toValue, float duration, Func<float, float> easing)
+    /// <param name="delay">Seconds to wait before the tween starts.</param>
+    /// <returns>The created Tween, supporting fluent chaining (.Easing, .RepeatForever, .AutoReverse).</returns>
+    public Tween TweenTo<T>(T target, Expression<Func<T, float>> member, float toValue, float duration, Func<float, float> easing, float delay = 0f)
         where T : class
     {
-        return _tweener.TweenTo(target, member, toValue, duration, 0f).Easing(easing);
+        return _tweener.TweenTo(target, member, toValue, duration, delay).Easing(easing);
     }
 
     /// <summary>Advances all active tweens by the elapsed game time.</summary>
     public void Update(GameTime gameTime)
     {
-        _tweener.Update((float)gameTime.ElapsedGameTime.TotalSeconds);
+        _tweener.Update(gameTime.GetElapsedSeconds());
     }
 
     /// <summary>Cancels and removes all active tweens.</summary>
@@ -29,7 +31,7 @@ public sealed class TweeningManager
     }
 
     /// <summary>Cancels a specific tween.</summary>
-    public static void Cancel(Tween tween)
+    public void Cancel(Tween tween)
     {
         tween.Cancel();
     }

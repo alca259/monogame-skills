@@ -58,7 +58,7 @@ public sealed class TweeningManagerTests
         TestTarget target = new() { Value = 0f };
         Tween tween = manager.TweenTo(target, t => t.Value, 100f, 2f, EasingCatalog.Linear);
 
-        Exception? ex = Record.Exception(() => TweeningManager.Cancel(tween));
+        Exception? ex = Record.Exception(() => manager.Cancel(tween));
         Assert.Null(ex);
     }
 

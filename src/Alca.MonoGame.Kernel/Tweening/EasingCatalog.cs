@@ -6,59 +6,59 @@ namespace Alca.MonoGame.Kernel.Tweening;
 public static class EasingCatalog
 {
     /// <summary>Constant-rate linear interpolation.</summary>
-    public static Func<float, float> Linear => EasingFunctions.Linear;
+    public static readonly Func<float, float> Linear = EasingFunctions.Linear;
 
     /// <summary>Quadratic ease-in (slow start).</summary>
-    public static Func<float, float> EaseIn => EasingFunctions.QuadraticIn;
+    public static readonly Func<float, float> EaseIn = EasingFunctions.QuadraticIn;
 
     /// <summary>Quadratic ease-out (slow end).</summary>
-    public static Func<float, float> EaseOut => EasingFunctions.QuadraticOut;
+    public static readonly Func<float, float> EaseOut = EasingFunctions.QuadraticOut;
 
     /// <summary>Quadratic ease-in-out (slow start and end).</summary>
-    public static Func<float, float> EaseInOut => EasingFunctions.QuadraticInOut;
+    public static readonly Func<float, float> EaseInOut = EasingFunctions.QuadraticInOut;
 
     /// <summary>Quadratic ease-in.</summary>
-    public static Func<float, float> QuadIn => EasingFunctions.QuadraticIn;
+    public static readonly Func<float, float> QuadIn = EasingFunctions.QuadraticIn;
 
     /// <summary>Quadratic ease-out.</summary>
-    public static Func<float, float> QuadOut => EasingFunctions.QuadraticOut;
+    public static readonly Func<float, float> QuadOut = EasingFunctions.QuadraticOut;
 
     /// <summary>Quadratic ease-in-out.</summary>
-    public static Func<float, float> QuadInOut => EasingFunctions.QuadraticInOut;
+    public static readonly Func<float, float> QuadInOut = EasingFunctions.QuadraticInOut;
 
     /// <summary>Cubic ease-in.</summary>
-    public static Func<float, float> CubicIn => EasingFunctions.CubicIn;
+    public static readonly Func<float, float> CubicIn = EasingFunctions.CubicIn;
 
     /// <summary>Cubic ease-out.</summary>
-    public static Func<float, float> CubicOut => EasingFunctions.CubicOut;
+    public static readonly Func<float, float> CubicOut = EasingFunctions.CubicOut;
 
     /// <summary>Cubic ease-in-out.</summary>
-    public static Func<float, float> CubicInOut => EasingFunctions.CubicInOut;
+    public static readonly Func<float, float> CubicInOut = EasingFunctions.CubicInOut;
 
     /// <summary>Bounce ease-in.</summary>
-    public static Func<float, float> BounceIn => EasingFunctions.BounceIn;
+    public static readonly Func<float, float> BounceIn = EasingFunctions.BounceIn;
 
     /// <summary>Bounce ease-out.</summary>
-    public static Func<float, float> BounceOut => EasingFunctions.BounceOut;
+    public static readonly Func<float, float> BounceOut = EasingFunctions.BounceOut;
 
     /// <summary>Bounce ease-in-out.</summary>
-    public static Func<float, float> BounceInOut => EasingFunctions.BounceInOut;
+    public static readonly Func<float, float> BounceInOut = EasingFunctions.BounceInOut;
 
     /// <summary>Elastic ease-in (overshoot spring).</summary>
-    public static Func<float, float> ElasticIn => EasingFunctions.ElasticIn;
+    public static readonly Func<float, float> ElasticIn = EasingFunctions.ElasticIn;
 
     /// <summary>Elastic ease-out.</summary>
-    public static Func<float, float> ElasticOut => EasingFunctions.ElasticOut;
+    public static readonly Func<float, float> ElasticOut = EasingFunctions.ElasticOut;
 
     /// <summary>Elastic ease-in-out.</summary>
-    public static Func<float, float> ElasticInOut => EasingFunctions.ElasticInOut;
+    public static readonly Func<float, float> ElasticInOut = EasingFunctions.ElasticInOut;
 
     /// <summary>Back ease-in (slight overshoot at start).</summary>
-    public static Func<float, float> BackIn => EasingFunctions.BackIn;
+    public static readonly Func<float, float> BackIn = EasingFunctions.BackIn;
 
     /// <summary>Back ease-out (slight overshoot at end).</summary>
-    public static Func<float, float> BackOut => EasingFunctions.BackOut;
+    public static readonly Func<float, float> BackOut = EasingFunctions.BackOut;
 
     /// <summary>Back ease-in-out.</summary>
-    public static Func<float, float> BackInOut => EasingFunctions.BackInOut;
+    public static readonly Func<float, float> BackInOut = EasingFunctions.BackInOut;
 }
