@@ -482,7 +482,7 @@ Todos los layouts heredan de `UIContainer` y overridean `Measure` y `Arrange`.
 
 ---
 
-### Milestone 5.7 — UI Controls de Entrada
+### Milestone 5.7 — UI Controls de Entrada ✅ COMPLETADO
 
 **`UI/Controls/Slider.cs`** — `sealed class Slider : UIElement, IUIInteractable, IFocusable`
 - `MinValue`, `MaxValue`, `Value` (float)
