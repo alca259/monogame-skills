@@ -3,6 +3,8 @@ namespace Alca.MonoGame.Kernel.Graphics.Shaders;
 /// <summary>A sprite-compatible material that exposes Alpha and TintColor as shader parameters.</summary>
 public sealed class SpriteMaterial : Material
 {
+    private readonly EffectParameter? _alphaParam;
+    private readonly EffectParameter? _tintColorParam;
     private float _alpha = 1f;
     private Color _tintColor = Color.White;
 
@@ -20,18 +22,17 @@ public sealed class SpriteMaterial : Material
         set => _tintColor = value;
     }
 
-    /// <summary>Initializes the sprite material with the given effect.</summary>
-    public SpriteMaterial(Effect effect) : base(effect) { }
+    /// <summary>Initializes the sprite material with the given effect. Caches shader parameter references.</summary>
+    public SpriteMaterial(Effect effect) : base(effect)
+    {
+        _alphaParam     = GetParameter("Alpha");
+        _tintColorParam = GetParameter("TintColor");
+    }
 
     /// <inheritdoc/>
     public override void Apply()
     {
-        EffectParameter? alphaParam = Effect.Parameters["Alpha"];
-        if (alphaParam is not null)
-            alphaParam.SetValue(_alpha);
-
-        EffectParameter? tintParam = Effect.Parameters["TintColor"];
-        if (tintParam is not null)
-            tintParam.SetValue(_tintColor.ToVector4());
+        _alphaParam?.SetValue(_alpha);
+        _tintColorParam?.SetValue(_tintColor.ToVector4());
     }
 }

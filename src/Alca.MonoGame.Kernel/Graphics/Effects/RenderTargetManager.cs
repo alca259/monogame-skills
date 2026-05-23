@@ -34,7 +34,7 @@ public sealed class RenderTargetManager : IDisposable
         _graphicsDevice.SetRenderTarget(_targetB);
         _graphicsDevice.Clear(Color.Transparent);
 
-        spriteBatch.Begin(effect: effect);
+        spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.Opaque, effect: effect);
         spriteBatch.Draw(_targetA, Vector2.Zero, Color.White);
         spriteBatch.End();
 
@@ -59,7 +59,7 @@ public sealed class RenderTargetManager : IDisposable
             _graphicsDevice.SetRenderTarget(isLast ? null : dest);
             _graphicsDevice.Clear(Color.Transparent);
 
-            spriteBatch.Begin(effect: effect);
+            spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.Opaque, effect: effect);
             spriteBatch.Draw(source, Vector2.Zero, Color.White);
             spriteBatch.End();
         }
