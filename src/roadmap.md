@@ -320,7 +320,7 @@ Integración en `Core.cs`: añadir `Localization` como propiedad estática.
 
 ---
 
-## FASE 5 — Sistema UI Completo
+## FASE 5 — Sistema UI Completo ✅ COMPLETADO
 
 > **Objetivo:** UI production-ready con layout, interacción, focus y todos los controles.
 
@@ -521,7 +521,7 @@ Todos los layouts heredan de `UIContainer` y overridean `Measure` y `Arrange`.
 
 ---
 
-### Milestone 5.8 — UI Controls Avanzados
+### Milestone 5.8 — UI Controls Avanzados ✅ COMPLETADO
 
 **`UI/Controls/Dropdown.cs`** — `sealed class Dropdown : UIElement, IUIInteractable, IFocusable`
 - `_options` (List<string> pre-allocated), `SelectedIndex` (int)
