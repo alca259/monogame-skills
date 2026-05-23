@@ -1,4 +1,5 @@
 using Alca.MonoGame.Kernel.Scenes;
+using Microsoft.Xna.Framework.Content;
 
 namespace Alca.MonoGame.Kernel.UnitTests.Scenes;
 
@@ -76,5 +77,13 @@ public sealed class SceneManagerTests
         Assert.True(sut.FadeAlpha > alphaAfterFirstUpdate);
     }
 
-    private sealed class MockScene : Scene { }
+    private sealed class MockScene : Scene
+    {
+        internal MockScene() : base(new ContentManager(new StubServiceProvider()) { RootDirectory = "Content" }) { }
+
+        private sealed class StubServiceProvider : IServiceProvider
+        {
+            public object? GetService(Type serviceType) => null;
+        }
+    }
 }

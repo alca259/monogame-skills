@@ -22,6 +22,12 @@ public abstract class Scene : IDisposable
         };
     }
 
+    /// <summary>Creates a scene with an explicit ContentManager. Used in unit tests to avoid Core dependency.</summary>
+    internal Scene(ContentManager content)
+    {
+        Content = content;
+    }
+
     /// <summary> Finalizer, called when object is cleaned up by garbage collector.</summary>
     ~Scene() => Dispose(false);
 

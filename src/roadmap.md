@@ -162,7 +162,7 @@ Paquete añadido:
 
 ---
 
-## FASE 3 — Sistemas de Juego Core ⬜ EN PROGRESO
+## FASE 3 — Sistemas de Juego Core ✅ EN PROGRESO
 
 > **Objetivo:** Partículas, tweening, audio avanzado, ECS extendido y escenas con stack.
 
@@ -191,7 +191,7 @@ Paquete añadido:
 - Motivo: formato XML custom sin soporte de tooling; la alternativa estándar es el sistema Tiled (TMX/JSON) de MonoGame.Extended.
 - **Migration:** Milestone 6.1 provee `TiledMapRenderer` y `TiledObjectLayer` como sustitutos.
 
-### Milestone 3.1 — Particle System (via MonoGame.Extended.Particles)
+### Milestone 3.1 — Particle System (via MonoGame.Extended.Particles) ✅ COMPLETADO
 
 **`Graphics/Particles/ParticleEffectWrapper.cs`** — `sealed class ParticleEffectWrapper`
 - Wrappea `MonoGame.Extended.Particles.ParticleEffect`
@@ -211,7 +211,7 @@ Paquete añadido:
 
 ---
 
-### Milestone 3.2 — Tweening System (via MonoGame.Extended.Tweening)
+### Milestone 3.2 — Tweening System (via MonoGame.Extended.Tweening) ✅ COMPLETADO
 
 **`Tweening/TweeningManager.cs`** — `sealed class TweeningManager`
 - Wrappea `MonoGame.Extended.Tweening.Tweener`
@@ -227,7 +227,7 @@ Integración en `Core.cs`: añadir `Tweening` como propiedad estática de tipo `
 
 ---
 
-### Milestone 3.3 — Audio Extendido
+### Milestone 3.3 — Audio Extendido ✅ COMPLETADO
 
 **`Audio/SoundEffectPool.cs`** — `sealed class SoundEffectPool : IDisposable`
 - Constructor: `SoundEffectPool(SoundEffect effect, int capacity)` — pre-alloca `capacity` instancias
@@ -745,3 +745,85 @@ src/Alca.MonoGame.Kernel/
 - **Fase 4:** `LocalizationManager.LoadLanguage("es")` + `GetString("key")` devuelve texto correcto. Cambio a `"en"` dispara `CultureChanged`.
 - **Fase 5:** UIRoot → GridLayout (3×2) → Buttons + Label + Slider. Tab navega entre elementos. Dropdown se abre, flipa si está abajo de pantalla. TextBox acepta input vía `Window.TextInput`.
 - **Fase 6:** `TiledMapRenderer` renderiza un `.tmx` correctamente con `Camera2D`. `TiledObjectLayer.GetSpawnPoints()` devuelve las posiciones de objetos marcados.
+
+---
+
+## Referencia Técnica del Proyecto
+
+> Esta sección documenta la estructura fija del repo para que no sea necesario explorarla en cada sesión.
+
+### Solución y proyectos
+
+```
+src/
+├── Alca.MonoGame.Kernel/                  ← librería principal
+│   └── Alca.MonoGame.Kernel.csproj
+└── Alca.MonoGame.Kernel.UnitTests/        ← tests xUnit
+    └── Alca.MonoGame.Kernel.UnitTests.csproj
+```
+
+### Dependencias NuGet (Kernel)
+
+| Paquete | Versión | Notas |
+|---------|---------|-------|
+| `MonoGame.Framework.DesktopGL` | 3.8.* | `PrivateAssets=All` — no se propaga al consumidor |
+| `MonoGame.Extended` | 6.0.* | Incluye Particles, Tweening, Tiled, BitmapFonts |
+| `Microsoft.Extensions.DependencyInjection` | 10.0.* | DI container |
+
+### Dependencias NuGet (Tests)
+
+| Paquete | Versión |
+|---------|---------|
+| `xunit` | 2.9.3 |
+| `xunit.runner.visualstudio` | 3.1.4 |
+| `Microsoft.NET.Test.Sdk` | 17.14.1 |
+| `coverlet.collector` | 6.0.4 |
+| `MonoGame.Framework.DesktopGL` | 3.8.* (`PrivateAssets=All`) |
+| `Microsoft.Extensions.DependencyInjection` | 10.0.* |
+
+El proyecto de tests referencia directamente el proyecto Kernel. Los tipos de `MonoGame.Extended` son accesibles transitivamente sin necesidad de añadir la referencia explícita en el csproj de tests.
+
+### Global Usings
+
+**Kernel** (`Globals.cs`):
+```csharp
+global using Microsoft.Xna.Framework;
+global using Microsoft.Xna.Framework.Audio;
+global using Microsoft.Xna.Framework.Content;
+global using Microsoft.Xna.Framework.Graphics;
+global using Microsoft.Xna.Framework.Input;
+global using Microsoft.Xna.Framework.Media;
+global using Microsoft.Extensions.DependencyInjection;
+```
+
+**Tests** (`Globals.cs`):
+```csharp
+global using Microsoft.Xna.Framework;
+global using Microsoft.Xna.Framework.Graphics;
+global using Alca.MonoGame.Kernel.Mathematics;
+global using Alca.MonoGame.Kernel.Graphics.Camera;
+```
+Los tests deben añadir `using` explícitos para cualquier otro namespace de Kernel o MonoGame.Extended que necesiten.
+
+### Convenciones de tests
+
+- Framework: **xUnit** con atributo `[Fact]`
+- Clases de test: `sealed`, un fichero por clase testeada
+- Nomenclatura de fichero: `{NombreClase}Tests.cs`
+- Ubicación en tests: espeja la carpeta origen en Kernel  
+  Ejemplo: `Kernel/Audio/SoundEffectPool.cs` → `Tests/Audio/SoundEffectPoolTests.cs`
+- Patrón de nombre de test: `Método_Escenario_ResultadoEsperado`
+- Aserciones: `Assert.*` de xUnit, con tolerancia decimal `(expected, actual, precision)` para floats
+
+### Notas de API críticas
+
+**Tweener.TweenTo constraint:** El método genérico `Tweener.TweenTo<TTarget, TMember>` de MonoGame.Extended impone `where TTarget : class`. Cualquier wrapper que exponga este método debe propagar la misma restricción:
+```csharp
+public Tween TweenTo<T>(T target, ...) where T : class { ... }
+```
+
+**Easing functions:** En MonoGame.Extended 6.0 no existe el delegado `EasingFunction`. Las funciones de easing son métodos estáticos en `EasingFunctions` con firma `float Method(float value)`, compatibles con `Func<float, float>`.
+
+**ParticleEmitter constructors:** `ParticleEmitter()` y `ParticleEmitter(int initialCapacity)`. La `TextureRegion` (`Texture2DRegion`) es una propiedad, no un parámetro de constructor — puede ser `null` en tests sin crash.
+
+**Tests con hardware de audio:** `SoundEffect` y `SoundEffectInstance` requieren OpenAL inicializado. Los tests de `SoundEffectPool` que necesiten instanciar un `SoundEffect` real deben marcarse con `[Trait("Category", "RequiresAudio")]` o validarse mediante reflexión sobre la API pública.

@@ -1,87 +1,111 @@
 namespace Alca.MonoGame.Kernel.ECS;
 
-public class GameWorld
+/// <summary>Owns all entities and drives the ECS loop. Equivalent to Unity's Scene.</summary>
+public sealed class GameWorld
 {
+    private readonly List<GameEntity> _entities = [];
+    private readonly List<GameEntity> _toAdd = [];
+    private readonly List<GameEntity> _toDestroy = [];
+
+    /// <summary>Gets or sets a value indicating whether this world processes updates. Draw always runs.</summary>
     public bool IsEnabled { get; set; } = true;
 
-    private readonly List<GameEntity> _entities = [];
-    private readonly List<GameEntity> _pendingAdd = [];
-    private readonly List<GameEntity> _pendingDestroy = [];
+    // ── Lifecycle ──────────────────────────────────────────────────────────────
 
-    public GameEntity CreateEntity()
-    {
-        var entity = new GameEntity
-        {
-            World = this
-        };
-        _pendingAdd.Add(entity);
-        return entity;
-    }
-
-    public void Destroy(GameEntity entity)
-    {
-        _pendingDestroy.Add(entity);
-    }
-
+    /// <summary>Flushes pending creation/destruction then updates all active entities.</summary>
     public void Update(GameTime gameTime)
     {
-        FlushPendingAdds();
+        FlushPending();
 
         if (!IsEnabled) return;
 
         for (int i = 0; i < _entities.Count; i++)
             _entities[i].Update(gameTime);
-
-        FlushPendingDestroys();
     }
 
+    /// <summary>Draws all active entities. Always runs regardless of <see cref="IsEnabled"/>.</summary>
     public void Draw(GameTime gameTime, SpriteBatch spriteBatch)
     {
-        // Always draw regardless of IsEnabled — pausing only stops updates, not rendering
         for (int i = 0; i < _entities.Count; i++)
             _entities[i].Draw(gameTime, spriteBatch);
     }
 
-    private void FlushPendingAdds()
+    // ── Entity management ──────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Creates an entity with a pre-attached <see cref="TransformBehaviour"/> at the given 2D position (Z = 0).
+    /// The entity is added to the world at the start of the next Update (deferred).
+    /// </summary>
+    public GameEntity CreateEntity(string name = "", Vector2 position = default)
     {
-        for (int i = 0; i < _pendingAdd.Count; i++)
-        {
-            var entity = _pendingAdd[i];
-            _entities.Add(entity);
-            entity.Start();
-        }
-        _pendingAdd.Clear();
+        var entity = new GameEntity(name) { World = this };
+        entity.Add(new TransformBehaviour(position));
+        _toAdd.Add(entity);
+        return entity;
     }
 
-    public T? GetBehaviour<T>() where T : GameBehaviour
+    /// <summary>
+    /// Creates an entity with a pre-attached <see cref="TransformBehaviour"/> at the given 3D position.
+    /// The entity is added to the world at the start of the next Update (deferred).
+    /// </summary>
+    public GameEntity CreateEntity(string name, Vector3 position)
+    {
+        var entity = new GameEntity(name) { World = this };
+        entity.Add(new TransformBehaviour(position));
+        _toAdd.Add(entity);
+        return entity;
+    }
+
+    /// <summary>
+    /// Schedules an entity for removal. It is removed from the world at the start of the next
+    /// Update (deferred) and <see cref="GameBehaviour.OnDestroy"/> is called on all its behaviours.
+    /// </summary>
+    public void Destroy(GameEntity entity)
+    {
+        if (!_toDestroy.Contains(entity))
+            _toDestroy.Add(entity);
+    }
+
+    // ── Queries ────────────────────────────────────────────────────────────────
+
+    /// <summary>Returns all entities that have a component of type T (concrete type or interface).</summary>
+    public IEnumerable<GameEntity> FindEntities<T>() where T : class
+    {
+        for (int i = 0; i < _entities.Count; i++)
+            if (_entities[i].HasComponent<T>()) yield return _entities[i];
+    }
+
+    /// <summary>Returns all components of type T (concrete type or interface) across all entities.</summary>
+    public IEnumerable<T> FindComponents<T>() where T : class
     {
         for (int i = 0; i < _entities.Count; i++)
         {
-            var b = _entities[i].GetComponent<T>();
-            if (b != null) return b;
+            var c = _entities[i].GetComponent<T>();
+            if (c is not null) yield return c;
         }
+    }
+
+    /// <summary>Returns the first entity with the given name, or null if none exists.</summary>
+    public GameEntity? FindByName(string name)
+    {
+        for (int i = 0; i < _entities.Count; i++)
+            if (_entities[i].Name == name) return _entities[i];
         return null;
     }
 
-    public List<T> GetBehaviours<T>() where T : GameBehaviour
-    {
-        var result = new List<T>();
-        for (int i = 0; i < _entities.Count; i++)
-        {
-            var b = _entities[i].GetComponent<T>();
-            if (b != null) result.Add(b);
-        }
-        return result;
-    }
+    // ── Internal ───────────────────────────────────────────────────────────────
 
-    private void FlushPendingDestroys()
+    private void FlushPending()
     {
-        for (int i = 0; i < _pendingDestroy.Count; i++)
+        for (int i = 0; i < _toAdd.Count; i++)
+            _entities.Add(_toAdd[i]);
+        _toAdd.Clear();
+
+        for (int i = 0; i < _toDestroy.Count; i++)
         {
-            var entity = _pendingDestroy[i];
-            entity.Destroy();
-            _entities.Remove(entity);
+            _toDestroy[i].Destroy();
+            _entities.Remove(_toDestroy[i]);
         }
-        _pendingDestroy.Clear();
+        _toDestroy.Clear();
     }
 }

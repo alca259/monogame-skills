@@ -5,6 +5,8 @@ public sealed class AudioController : IDisposable
     /// <summary> Tracks sound effect instances created so they can be paused, unpaused, and/or disposed.</summary>
     private readonly List<SoundEffectInstance> _activeSoundEffectInstances = [];
 
+    private readonly AudioListener3D _listener = new();
+
     /// <summary> Tracks the volume for song playback when muting and unmuting.</summary>
     private float _previousSongVolume;
 
@@ -175,6 +177,18 @@ public sealed class AudioController : IDisposable
         {
             MuteAudio();
         }
+    }
+
+    /// <summary>Creates a pre-allocated sound effect pool with the given capacity for high-frequency playback.</summary>
+    public static SoundEffectPool CreatePool(SoundEffect effect, int capacity)
+    {
+        return new SoundEffectPool(effect, capacity);
+    }
+
+    /// <summary>Updates the 3D listener position and forward direction for spatial audio calculations.</summary>
+    public void UpdateListener(Vector3 position, Vector3 forward)
+    {
+        _listener.Update(position, forward);
     }
 
     /// <summary>Disposes of this audio controller and cleans up resources.</summary>
