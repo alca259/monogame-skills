@@ -588,7 +588,7 @@ Todos los layouts heredan de `UIContainer` y overridean `Measure` y `Arrange`.
 
 ---
 
-### Milestone 6.2 — Bitmap Fonts
+### Milestone 6.2 — Bitmap Fonts ✅ COMPLETADO
 
 **`Graphics/Fonts/BitmapFontRenderer.cs`** — `sealed class BitmapFontRenderer`
 - `Load(ContentManager content, string assetName)` → carga `BitmapFont` de MonoGame.Extended
@@ -598,6 +598,84 @@ Todos los layouts heredan de `UIContainer` y overridean `Measure` y `Arrange`.
 - `DrawCentered(SpriteBatch sb, string text, Rectangle bounds, Color color)` — helper de centrado
 
 ---
+
+## Milestone 6.3 — Input Manager Extendido
+
+> Wrapper sobre el sistema de input actual del kernel, añadiendo helpers de alto nivel y soporte para input mapping configurable.
+
+**`Input/InputAction.cs`** — `sealed class InputAction`
+- `Name` (string) — identificador de la acción ("Jump", "Fire", "MoveLeft"…)
+- `_keyBindings` (Keys[] field, pre-allocated) — teclas asociadas
+- `_padBindings` (Buttons[] field, pre-allocated) — botones de gamepad asociados
+- `_mouseBindings` (MouseButton[] field, pre-allocated)
+- `IsPressed`, `IsReleased`, `IsHeld` (bool, calculados en Update)
+- Sin alloc: no usa LINQ, no crea listas en Update
+
+**`Input/InputActionMap.cs`** — `sealed class InputActionMap`
+- `_actions` (Dictionary<string, InputAction> pre-allocated)
+- `Register(InputAction action)`, `Unregister(string name)`
+- `Get(string name)` → `InputAction?`
+- `Update(KeyboardState curr, KeyboardState prev, MouseState currM, MouseState prevM, GamePadState currP, GamePadState prevP)` — itera `for` indexado sobre las acciones registradas y actualiza cada una
+
+**`Input/InputManager.cs`** — `sealed class InputManager`
+- Gestiona los estados prev/curr de teclado, ratón y gamepad (el patrón del skill)
+- `_activeMap` (InputActionMap? field) — mapa activo
+- `LoadMap(InputActionMap map)` / `UnloadMap()`
+- `Update(GameTime gameTime)` — actualiza todos los estados y propaga al mapa activo
+- Helpers de conveniencia delegados: `IsKeyPressed(Keys)`, `IsKeyHeld(Keys)`, `IsKeyReleased(Keys)`, `MousePosition` (Vector2 field, no `new` inline)
+- Integración en `Core.cs`: `public static InputManager Input { get; }` expuesto como propiedad estática
+
+**`Input/InputBinding.cs`** — `readonly struct InputBinding`
+- Representa un binding serializable: `DeviceType` (enum: Keyboard/Mouse/Gamepad), `Code` (int, cast desde Keys/Buttons/MouseButton)
+- `ToDisplayString()` → string legible ("Space", "A (Gamepad)", …)
+
+**`Input/InputSerializer.cs`** — `sealed class InputSerializer`
+- `Save(InputActionMap map, string filePath)` — serializa a JSON con `System.Text.Json` (async, `Task`)
+- `Load(string filePath)` → `Task<InputActionMap>` — deserializa en background, sin tocar GraphicsDevice
+- Patrón del skill async: el caller debe aplicar el resultado en el main thread
+
+---
+
+## Milestone 6.4 — Async Content Loading
+
+> Infraestructura para carga asíncrona de assets con pantalla de carga, progreso y cancelación.
+
+**`Content/AsyncContentLoader.cs`** — `sealed class AsyncContentLoader : IDisposable`
+- `_pendingAssets` (Queue<string> pre-allocated) — cola de assets pendientes de cargar en main thread
+- `_cancelSource` (CancellationTokenSource field)
+- `LoadAsync<T>(string assetName, IProgress<float>? progress, CancellationToken ct)` → `Task<T>`
+  - Fases: lectura de bytes en background (`Task.Run`) → enqueue del asset name → `Content.Load<T>()` en main thread
+  - Patrón del skill: **nunca llama `Content.Load<T>()` desde el body de `Task.Run`**
+- `FlushPending(ContentManager content)` — llamado desde `Update()` en main thread; procesa la cola de pendientes (máx. N assets por frame, configurable)
+- `Cancel()` — cancela operaciones en curso vía `CancellationTokenSource`
+- `Dispose()` — limpia `CancellationTokenSource`
+
+**`Content/ContentLoadGroup.cs`** — `sealed class ContentLoadGroup`
+- `_assetNames` (List<string> pre-allocated)
+- `Add(string assetName)` — registra un asset en el grupo
+- `LoadAllAsync(AsyncContentLoader loader, IProgress<float>? progress, CancellationToken ct)` → `Task`
+  - Progreso: `(assetsCompleted / totalAssets)` reportado vía `IProgress<float>`
+  - Sin bloqueo: itera con `for` indexado, `await` cada `LoadAsync` individualmente
+
+**`Scenes/LoadingScene.cs`** — `sealed class LoadingScene : Scene`
+- `_loader` (AsyncContentLoader field)
+- `_group` (ContentLoadGroup field)
+- `_progress` (float field, 0–1)
+- `Configure(ContentLoadGroup group, Scene nextScene)` — setup antes de iniciar
+- `Initialize()` — arranca `group.LoadAllAsync(...)` con `Progress<float>` que actualiza `_progress`; sigue el patrón: `_loadTask = Task.Run(...)`, no bloquea
+- `Update()` — llama `_loader.FlushPending(Content)` (main thread GPU upload); comprueba `_loadTask.IsCompleted` sin `.Wait()` ni `.Result` bloqueante; cuando completa hace `SceneManager.RequestChange(nextScene)`
+- `Draw()` — renderiza barra de progreso usando `ProgressBar` del sistema UI o `DrawHelper` directamente
+
+**`Content/ContentGroupBuilder.cs`** — `sealed class ContentGroupBuilder`
+- Fluent API para construir un `ContentLoadGroup`:
+  - `Add(string assetName)` → `ContentGroupBuilder`
+  - `AddRange(IEnumerable<string> names)` → `ContentGroupBuilder` (solo fuera del game loop)
+  - `Build()` → `ContentLoadGroup`
+
+**Tests** (`UnitTests/Content/AsyncContentLoaderTests.cs`):
+- Verifican que `FlushPending` no llama a `Content.Load<T>()` si la cola está vacía
+- Verifican que `Cancel()` aborta el `CancellationTokenSource`
+- Verifican progreso incremental en `ContentLoadGroup` (mock de `IProgress<float>`)
 
 ## Integración en Core.cs
 
