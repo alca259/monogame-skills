@@ -434,7 +434,7 @@ Todos los layouts heredan de `UIContainer` y overridean `Measure` y `Arrange`.
 
 ---
 
-### Milestone 5.6 — UI Controls Básicos
+### Milestone 5.6 — UI Controls Básicos ✅ COMPLETADO
 
 **`UI/Controls/Label.cs`** — `sealed class Label : UIElement`
 - `Text` (string), `Font` (SpriteFont), `Color` (Color)
