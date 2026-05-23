@@ -65,17 +65,16 @@ All members of the static class `EasingFunctions`:
 
 ```
 Linear
-QuadraticIn       QuadraticOut       QuadraticEaseInOut
-CubicIn           CubicOut           CubicEaseInOut
-QuarticIn         QuarticOut         QuarticEaseInOut
-QuinticIn         QuinticOut         QuinticEaseInOut
-SineIn            SineOut            SineEaseInOut
-ExponentialIn     ExponentialOut     ExponentialEaseInOut
-CircularIn        CircularOut        CircularEaseInOut
-ElasticIn         ElasticOut         ElasticEaseInOut
-BackIn            BackOut            BackEaseInOut
-BounceIn          BounceOut          BounceEaseInOut
+QuadraticIn       QuadraticOut       QuadraticInOut
+CubicIn           CubicOut           CubicInOut
+ElasticIn         ElasticOut         ElasticInOut
+BackIn            BackOut            BackInOut
+BounceIn          BounceOut          BounceInOut
 ```
+
+**Important (v6):** Quartic, Quintic, Sine, Exponential, and Circular families
+**do not exist** in MonoGame.Extended v6's `EasingFunctions`. The `InOut` suffix is
+also `InOut`, never `EaseInOut`.
 
 ---
 
@@ -106,7 +105,7 @@ protected override void Update(GameTime gameTime)
         _isHovered = hoveredNow;
         float targetScale = _isHovered ? 1.12f : 1.0f;
         float duration    = _isHovered ? 0.18f : 0.10f;
-        EasingFunction easing = _isHovered
+        Func<float, float> easing = _isHovered
             ? EasingFunctions.ElasticOut
             : EasingFunctions.CubicOut;
 

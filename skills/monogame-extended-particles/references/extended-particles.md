@@ -20,11 +20,13 @@ API signatures and ready-to-paste C# code for `ParticleEffect` and `ParticleEmit
 ## Namespaces
 
 ```csharp
+using MonoGame.Extended;                                          // HslColor
+using MonoGame.Extended.Graphics;                                  // Texture2DRegion
 using MonoGame.Extended.Particles;
+using MonoGame.Extended.Particles.Data;                           // ParticleReleaseParameters, ParticleFloatParameter, ParticleColorParameter
 using MonoGame.Extended.Particles.Profiles;
 using MonoGame.Extended.Particles.Modifiers;
 using MonoGame.Extended.Particles.Modifiers.Interpolators;
-using MonoGame.Extended.Graphics;   // Texture2DRegion
 ```
 
 ---
@@ -335,7 +337,7 @@ Used inside `AgeModifier.Interpolators`:
 new OpacityInterpolator  { StartValue = float, EndValue = float }
 new ScaleInterpolator    { StartValue = Vector2, EndValue = Vector2 }
 new RotationInterpolator { StartValue = float, EndValue = float }
-new ColorInterpolator    { StartValue = Vector3, EndValue = Vector3 }  // HSL
+new ColorInterpolator    { StartValue = HslColor, EndValue = HslColor }  // use HslColor.FromRgb(Color) to convert
 new HueInterpolator      { StartValue = float, EndValue = float }      // 0–360
 new VelocityInterpolator { StartValue = float, EndValue = float }
 ```

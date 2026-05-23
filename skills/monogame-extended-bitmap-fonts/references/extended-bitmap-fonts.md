@@ -17,7 +17,7 @@ API signatures and ready-to-paste C# code for loading and rendering BitmapFont.
 ## Namespaces
 
 ```csharp
-using MonoGame.Extended.Graphics;      // BitmapFont class
+using MonoGame.Extended.BitmapFonts;   // BitmapFont class
 // DrawString extension is automatically available after adding MonoGame.Extended NuGet
 ```
 
@@ -119,31 +119,27 @@ _spriteBatch.DrawString(
 
 ## Text alignment and sizing
 
-The measurement API depends on the MonoGame.Extended version. Try in this order:
+`BitmapFont.MeasureString(string)` returns a `SizeF` (from `MonoGame.Extended`) with
+`.Width` and `.Height` fields. This is the correct v6 API:
 
 ```csharp
-// Option A: GetSize (returns Size2 — available in some versions)
-Size2 size = _font.GetSize("Hello");
+SizeF size = _font.MeasureString("Hello");
 float textW = size.Width;
 float textH = size.Height;
-
-// Option B: check for extension methods in MonoGame.Extended.BitmapFonts namespace
-// using MonoGame.Extended.BitmapFonts;
-// var rect = _font.GetStringRectangle("Hello", Vector2.Zero);
-
-// Option C: manual using LineHeight for approximate centering
-float textH = _font.LineHeight;
 ```
 
-Centered draw using measured size (Option A):
+Centered draw using measured size:
 ```csharp
-Size2 size = _font.GetSize(text);
+SizeF size = _font.MeasureString(text);
 Vector2 centeredPos = new Vector2(
     screenWidth  / 2f - size.Width  / 2f,
     screenHeight / 2f - size.Height / 2f
 );
 _spriteBatch.DrawString(_font, text, centeredPos, Color.White);
 ```
+
+**Do not use** `font.GetSize(string)` — that method does not exist in v6.
+For line height only, `_font.LineHeight` (int) is also available.
 
 ---
 

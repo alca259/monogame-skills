@@ -86,14 +86,21 @@ one-line change.
 
 ## Text Alignment and Positioning
 
-The documentation for v6 does not expose a `MeasureString` method by that name.
-Before centering text, verify which measurement API is available in your version:
+`BitmapFont.MeasureString(string)` returns a `SizeF` (from `MonoGame.Extended`) with
+`.Width` and `.Height` fields. Use it for centering:
 
-- Check for `font.GetSize(string)` (returns `Size2` with Width and Height)
-- Or check for extension methods in `MonoGame.Extended.BitmapFonts`
+```csharp
+using MonoGame.Extended.BitmapFonts;  // BitmapFont
 
-If neither is available, measure manually using `font.LineHeight` and approximate
-character widths, or render to a `RenderTarget2D` and read back the used bounds.
+SizeF size = _font.MeasureString(text);
+Vector2 centeredPos = new Vector2(
+    screenWidth  / 2f - size.Width  / 2f,
+    screenHeight / 2f - size.Height / 2f
+);
+_spriteBatch.DrawString(_font, text, centeredPos, Color.White);
+```
+
+Do not use `font.GetSize(string)` — that method does not exist in v6.
 
 ## Integration with monogame-ui-controls Label
 
