@@ -24,26 +24,20 @@ El objetivo es extenderla con todos los sistemas cubiertos por las skills dispon
 
 ---
 
-## Prerrequisito: Dependencias NuGet
+## Prerrequisito: Dependencias NuGet ✅ COMPLETADO
 
 **Archivo:** `src/Alca.MonoGame.Kernel/Alca.MonoGame.Kernel.csproj`
 
-Añadir los siguientes paquetes:
-- `MonoGame.Extended` (core)
-- `MonoGame.Extended.Tiled`
-- `MonoGame.Extended.BitmapFonts`
-- `MonoGame.Extended.Tweening`
-- `MonoGame.Extended.Particles`
-
-`System.Text.Json` no necesita NuGet (incluido en .NET 10 BCL).
+Paquete añadido:
+- `MonoGame.Extended` 6.0.* (incluye Tiled, Tweening, Particles, BitmapFonts en un único paquete a partir de v6)
 
 ---
 
-## FASE 1 — Fundamentos Matemáticos y de Cámara
+## FASE 1 — Fundamentos Matemáticos y de Cámara ✅ COMPLETADA
 
 > **Objetivo:** Infraestructura matemática y de cámara que el resto de sistemas necesita.
 
-### Milestone 1.1 — Math Utilities
+### Milestone 1.1 — Math Utilities ✅
 
 **`Math/MathUtils.cs`** — `static sealed class MathUtils`
 - `DistanceSquared(Vector2 a, Vector2 b)` — evita sqrt innecesario
@@ -64,7 +58,7 @@ Añadir los siguientes paquetes:
 
 ---
 
-### Milestone 1.2 — Camera 2D
+### Milestone 1.2 — Camera 2D ✅
 
 **`Graphics/Camera/Camera2D.cs`** — `sealed class Camera2D`
 - Campos pre-allocated: `_transform` (Matrix), `_inverseTransform` (Matrix)
@@ -77,7 +71,7 @@ Añadir los siguientes paquetes:
 
 ---
 
-### Milestone 1.3 — Camera 3D
+### Milestone 1.3 — Camera 3D ✅
 
 **`Graphics/Camera/Camera3D.cs`** — `abstract class Camera3D`
 - Propiedades abstractas: `View` (Matrix), `Projection` (Matrix)
@@ -105,7 +99,7 @@ Añadir los siguientes paquetes:
 
 ---
 
-### Milestone 1.4 — Resolution Independence
+### Milestone 1.4 — Resolution Independence ✅
 
 **`Graphics/ResolutionManager.cs`** — `sealed class ResolutionManager`
 - `VirtualWidth`, `VirtualHeight` (int) — resolución de diseño (default 1920×1080)
@@ -118,11 +112,11 @@ Añadir los siguientes paquetes:
 
 ---
 
-## FASE 2 — Rendering Avanzado
+## FASE 2 — Rendering Avanzado ✅ COMPLETADA
 
 > **Objetivo:** Shaders, efectos de post-procesado y soporte 3D.
 
-### Milestone 2.1 — Render Targets y Post-Processing
+### Milestone 2.1 — Render Targets y Post-Processing ✅
 
 **`Graphics/Effects/RenderTargetManager.cs`** — `sealed class RenderTargetManager : IDisposable`
 - `_targetA`, `_targetB` (RenderTarget2D) — ping-pong pre-allocated
@@ -138,7 +132,7 @@ Añadir los siguientes paquetes:
 
 ---
 
-### Milestone 2.2 — Material y Shader System
+### Milestone 2.2 — Material y Shader System ✅
 
 **`Graphics/Shaders/Material.cs`** — `abstract class Material`
 - `Effect Effect { get; }` — el Effect cargado vía `Content.Load<Effect>`
@@ -151,7 +145,7 @@ Añadir los siguientes paquetes:
 
 ---
 
-### Milestone 2.3 — 3D Rendering
+### Milestone 2.3 — 3D Rendering ✅
 
 **`Graphics/ThreeD/MeshRenderer.cs`** — `sealed class MeshRenderer`
 - `Load(ContentManager content, string assetName)` → carga un `Model`
