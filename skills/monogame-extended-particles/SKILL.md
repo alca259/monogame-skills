@@ -19,14 +19,16 @@ read `references/extended-particles.md`.
 ## Required Namespaces
 
 ```csharp
+using MonoGame.Extended;                                          // HslColor
+using MonoGame.Extended.Graphics;                                  // Texture2DRegion
 using MonoGame.Extended.Particles;
+using MonoGame.Extended.Particles.Data;                           // ParticleReleaseParameters, ParticleFloatParameter, ParticleColorParameter
 using MonoGame.Extended.Particles.Profiles;
 using MonoGame.Extended.Particles.Modifiers;
 using MonoGame.Extended.Particles.Modifiers.Interpolators;
-using MonoGame.Extended.Graphics;   // Texture2DRegion
 ```
 
-All five must be present — forgetting any one will cause compilation errors.
+All seven must be present — forgetting any one will cause compilation errors.
 
 ## Core Structure
 

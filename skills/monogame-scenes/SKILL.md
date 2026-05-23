@@ -7,112 +7,81 @@ description: MonoGame scene and screen management implementation guide covering 
 
 This skill guides scene/screen architecture in MonoGame. For transition effect code, see `references/scenes.md`.
 
-## Scene Interface
+## Scene Base Class
 
-Every scene implements this lifecycle. Use an abstract base class or interface:
+Every scene derives from `Scene` (`Alca.MonoGame.Kernel.Scenes`). All lifecycle methods are `virtual`, none are abstract — override only what you need:
 
 ```csharp
-public abstract class Scene
+public abstract class Scene : IDisposable
 {
-    protected Game  Game    { get; }
-    protected SpriteBatch SpriteBatch { get; }
-    protected ContentManager Content { get; }
+    protected ContentManager Content { get; }  // per-scene, auto-disposed
+    public bool IsDisposed { get; }
+    public virtual bool IsOverlay => false;    // true = drawn on top, base scene still draws
 
-    protected Scene(Game game, SpriteBatch spriteBatch)
-    {
-        Game        = game;
-        SpriteBatch = spriteBatch;
-        Content     = new ContentManager(game.Services, "Content");
-    }
-
-    public virtual  void Initialize()               { }
-    public virtual  void LoadContent()              { }
-    public abstract void Update(GameTime gameTime);
-    public abstract void Draw(GameTime gameTime);
-    public virtual  void UnloadContent()
-    {
-        Content.Unload();
-        Content.Dispose();
-    }
+    public virtual void Initialize() { }       // calls PreInitialize → LoadContent → PostInitialize
+    protected virtual void PreInitialize() { }
+    public virtual void LoadContent() { }
+    protected virtual void PostInitialize() { } // calls InitializeUI()
+    protected virtual void InitializeUI() { }  // hook for UI setup after content is loaded
+    public virtual void UnloadContent() { Content.Unload(); }
+    public virtual void Update(GameTime gameTime) { }
+    public virtual void Draw(GameTime gameTime) { }
+    public void Dispose() { ... }              // calls UnloadContent + Content.Dispose
 }
 ```
 
-Each scene owns its own `ContentManager`. Call `UnloadContent()` when leaving the scene to release its assets.
+Each scene gets its own `ContentManager` automatically — no constructor parameters needed. Assets are released when the scene is disposed.
 
-## SceneManager (State Machine)
-
-The `SceneManager` sits inside `Game1` and delegates `Update`/`Draw` to the active scene:
+**Overlay scenes:** Override `IsOverlay => true` to let the scene below keep drawing (e.g. pause menu over gameplay). The base scene's `Draw` still runs; only the overlay scene's `Update` runs.
 
 ```csharp
-public class SceneManager
+public sealed class PauseScene : Scene
 {
-    private Scene _currentScene;
-    private Scene _nextScene;    // deferred switch — never switch mid-Update
+    public override bool IsOverlay => true;
 
-    public void SwitchTo(Scene newScene)
+    public override void LoadContent()
     {
-        _nextScene = newScene;   // queued, not immediate
+        _font = Content.Load<SpriteFont>("Fonts/UI");
     }
 
-    public void Update(GameTime gameTime)
+    protected override void InitializeUI()
     {
-        // Apply deferred switch at the start of a frame
-        if (_nextScene != null)
-        {
-            _currentScene?.UnloadContent();
-            _currentScene = _nextScene;
-            _nextScene    = null;
-            _currentScene.Initialize();
-            _currentScene.LoadContent();
-        }
-        _currentScene?.Update(gameTime);
+        // UI elements created here — content is already loaded
     }
 
-    public void Draw(GameTime gameTime)
-    {
-        _currentScene?.Draw(gameTime);
-    }
+    public override void Update(GameTime gameTime) { ... }
+    public override void Draw(GameTime gameTime) { ... }
 }
 ```
 
-**Never switch scenes mid-Update** — queue the switch with `_nextScene` and apply it at the top of the next frame. Switching mid-Update can invalidate iterators and cause null-reference errors in the current scene's Update logic.
+## SceneManager
 
-## Scene Stack (for Pause / Overlays)
-
-When you need the game scene to remain visible under a pause menu, use a stack:
+Access via `Core.SceneManager`. The `SceneManager` sits inside the kernel and delegates `Update`/`Draw` to the active scene:
 
 ```csharp
-private readonly Stack<Scene> _stack = new();
+// Full scene replacement with fade (0.3 s):
+Core.SceneManager.RequestChange(new GameplayScene());
 
-public void Push(Scene scene)
-{
-    scene.Initialize();
-    scene.LoadContent();
-    _stack.Push(scene);
-}
+// Push overlay (no fade — base scene remains visible if IsOverlay == true):
+Core.SceneManager.PushScene(new PauseScene());
 
-public void Pop()
-{
-    if (_stack.Count == 0) return;
-    _stack.Peek().UnloadContent();
-    _stack.Pop();
-}
-
-public void Update(GameTime gameTime)
-{
-    // Only the top scene updates:
-    _stack.Peek()?.Update(gameTime);
-}
-
-public void Draw(GameTime gameTime)
-{
-    // All scenes draw, bottom to top:
-    foreach (var scene in _stack.Reverse())
-        scene.Draw(gameTime);
-}
+// Remove top overlay:
+Core.SceneManager.PopScene();
 ```
 
-The game scene is paused (no Update) but remains visible behind the pause overlay. The pause scene draws on top.
+**`RequestChange` vs `PushScene`:**
+- `RequestChange` — replaces the current scene with a fade-out/in transition; disposes the old scene and all stacked overlays.
+- `PushScene` — adds an overlay on top of the current scene (max 4 overlays). No fade.
+
+**DrawFadeOverlay:** The fade black overlay must be drawn manually after the scene draw pass:
+
+```csharp
+// In your Game.Draw override (if you don't subclass Core):
+Core.SceneManager.Draw(gameTime);
+Core.SceneManager.DrawFadeOverlay(Core.SpriteBatch, Core.GraphicsDevice, _fadePixel);
+```
+
+When using `Core` as base class, this is already wired in.
 
 ## Scene Transitions
 
@@ -172,11 +141,13 @@ Never mix world sprites and UI sprites in the same `Begin`/`End` pair — UI pos
 
 ## Rules
 
-- Never switch scenes mid-Update — queue with `_nextScene` and apply at the top of the next frame.
-- Each scene owns a `ContentManager` — call `Unload()` + `Dispose()` in `UnloadContent()`.
+- Use `Core.SceneManager.RequestChange(scene)` for transitions; never switch mid-Update.
+- Use `Core.SceneManager.PushScene(overlay)` / `PopScene()` for overlays (max 4 stacked).
+- Each scene gets its own `ContentManager` automatically — no setup needed.
 - Never store cross-scene asset references — each scene is self-contained.
 - UI draws in a separate `SpriteBatch.Begin/End` with no camera transform.
-- On stack-based managers, only the top scene updates; all scenes draw bottom-to-top.
+- Override `IsOverlay => true` so the base scene keeps drawing behind the overlay.
+- `DrawFadeOverlay()` must be called manually after `Draw()` when not using `Core`.
 
 ## Reference
 

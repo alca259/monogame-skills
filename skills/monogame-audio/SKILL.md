@@ -128,6 +128,36 @@ protected override void UnloadContent()
 
 Never dispose a `SoundEffectInstance` while it is playing — call `Stop()` first.
 
+## AudioController Wrapper (Alca.MonoGame.Kernel)
+
+The library provides `AudioController` as a managed wrapper over MonoGame raw audio. Access it via `Core.Audio`. It auto-tracks playing instances and simplifies common operations.
+
+```csharp
+// Play a sound effect (returns the SoundEffectInstance for optional further control):
+SoundEffectInstance inst = Core.Audio.PlaySoundEffect(_jumpSound);
+SoundEffectInstance loop = Core.Audio.PlaySoundEffect(_engine, volume: 0.8f, isLooped: true);
+// Optional parameters: volume (1f), pitch (1f), pan (0f), isLooped (false)
+
+// Background music — static wrapper around MediaPlayer:
+AudioController.PlaySong(_bgMusic, isRepeating: true);
+
+// Mute / pause controls:
+Core.Audio.MuteAudio();
+Core.Audio.UnmuteAudio();
+Core.Audio.ToggleMute();
+Core.Audio.PauseAudio();
+Core.Audio.ResumeAudio();
+
+// Pool for high-frequency sounds — created once in LoadContent:
+SoundEffectPool gunPool = AudioController.CreatePool(_gunSound, capacity: 8);
+gunPool.Play(); // round-robin across the 8 pre-created instances
+
+// 3D audio — update the listener each frame:
+Core.Audio.UpdateListener(playerPosition3D, forwardVector3D);
+```
+
+`SoundEffectPool` is the library equivalent of the manual round-robin pool described above — prefer it over hand-rolled pools.
+
 ## Rules
 
 - Load all audio in `LoadContent()` — no exceptions.

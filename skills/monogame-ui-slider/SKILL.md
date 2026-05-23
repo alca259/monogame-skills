@@ -5,13 +5,23 @@ description: MonoGame UI Slider / TrackBar control — horizontal or vertical ra
 
 # MonoGame UI Slider
 
-A slider lets the user pick a float value within a [Min, Max] range by dragging a thumb along a track. Supports horizontal and vertical orientation, optional step snapping, keyboard navigation, and gamepad control.
+A slider lets the user pick a float value within a [MinValue, MaxValue] range by dragging a thumb along a track. Supports horizontal and vertical orientation, optional step snapping, keyboard navigation, and gamepad control.
 
 For complete code templates, read `references/ui-slider.md`.
 
 ## Assumed Contract
 
 Extends `UIElement` from `monogame-ui-core`. Receives pointer events from `monogame-ui-interaction` (`OnPointerDown`, `OnPointerUp`, pointer position). Participates in focus via `monogame-ui-focus` for keyboard/gamepad increment.
+
+## Constructor
+
+```csharp
+var slider = new Slider(pixel);          // pixel = 1×1 white Texture2D
+slider.MinValue = 0f;
+slider.MaxValue = 100f;
+slider.Step     = 1f;                    // 0 = continuous float
+slider.Orientation = Orientation.Horizontal;
+```
 
 ## Anatomy
 
@@ -23,14 +33,14 @@ Track (background rectangle)
 
 **Value → pixel position:**
 ```csharp
-float normalized = (Value - Min) / (Max - Min);  // 0.0–1.0
+float normalized = (Value - MinValue) / (MaxValue - MinValue);  // 0.0–1.0
 int   thumbX     = trackRect.X + (int)(normalized * trackRect.Width);
 ```
 
 **Pixel position → value (on drag):**
 ```csharp
 float normalized = MathHelper.Clamp((mouseX - trackRect.X) / (float)trackRect.Width, 0f, 1f);
-float rawValue   = Min + normalized * (Max - Min);
+float rawValue   = MinValue + normalized * (MaxValue - MinValue);
 Value = Step > 0 ? MathF.Round(rawValue / Step) * Step : rawValue;
 ```
 
@@ -49,10 +59,10 @@ During drag, re-read mouse position every `Update()` frame and recalculate `Valu
 
 ```csharp
 // Integer slider (0, 1, 2, ... 10):
-slider.Min = 0; slider.Max = 10; slider.Step = 1;
+slider.MinValue = 0; slider.MaxValue = 10; slider.Step = 1;
 
 // Float slider in 0.25 increments:
-slider.Min = 0; slider.Max = 1; slider.Step = 0.25f;
+slider.MinValue = 0; slider.MaxValue = 1; slider.Step = 0.25f;
 ```
 
 ## Keyboard / Gamepad
@@ -69,15 +79,13 @@ Extend the thumb's hit area to at least 20×20 px for accessibility even if the 
 
 ## Events
 
-- `ValueChanged(UISlider sender, float value)` — fires whenever `Value` changes (drag or keyboard)
-- `DragStarted` / `DragEnded` — optional; useful to pause game state during drag
+- `event Action<float>? ValueChanged` — fires whenever `Value` changes (drag or keyboard); receives the new value
 
 ## Anti-Patterns
 
-- Do not call `Mouse.GetState()` inside the slider — the interaction manager polls it and delivers position via `UIPointerEventArgs`.
 - Do not fire `ValueChanged` if the value did not actually change (compare to previous before invoking).
 - Do not use float equality (`value == prev`) to check — use `MathF.Abs(value - prev) > 0.0001f`.
 
 ## Reference
 
-Complete `UISlider` template: `references/ui-slider.md`.
+Complete `Slider` template: `references/ui-slider.md`.

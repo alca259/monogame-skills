@@ -61,15 +61,14 @@ All functions live in `EasingFunctions`. Each comes in three variants:
 | Family | In | Out | InOut | Best for |
 |--------|----|-----|-------|----------|
 | Linear | `Linear` | — | — | Progress bars, constant motion |
-| Quadratic | `QuadraticIn` | `QuadraticOut` | `QuadraticEaseInOut` | General UI, subtle feel |
-| Cubic | `CubicIn` | `CubicOut` | `CubicEaseInOut` | Smooth UI transitions |
-| Quartic | `QuarticIn` | `QuarticOut` | `QuarticEaseInOut` | Stronger version of cubic |
-| Elastic | `ElasticIn` | `ElasticOut` | `ElasticEaseInOut` | Bouncy button press, spring |
-| Bounce | `BounceIn` | `BounceOut` | `BounceEaseInOut` | Dropped object, impact feel |
-| Back | `BackIn` | `BackOut` | `BackEaseInOut` | Slight overshoot, playful UI |
-| Sine | `SineIn` | `SineOut` | `SineEaseInOut` | Very gentle, wave-like motion |
-| Exponential | `ExponentialIn` | `ExponentialOut` | `ExponentialEaseInOut` | Fast acceleration/deceleration |
-| Circular | `CircularIn` | `CircularOut` | `CircularEaseInOut` | Mechanical feel |
+| Quadratic | `QuadraticIn` | `QuadraticOut` | `QuadraticInOut` | General UI, subtle feel |
+| Cubic | `CubicIn` | `CubicOut` | `CubicInOut` | Smooth UI transitions |
+| Elastic | `ElasticIn` | `ElasticOut` | `ElasticInOut` | Bouncy button press, spring |
+| Bounce | `BounceIn` | `BounceOut` | `BounceInOut` | Dropped object, impact feel |
+| Back | `BackIn` | `BackOut` | `BackInOut` | Slight overshoot, playful UI |
+
+Note: Quartic, Quintic, Sine, Exponential, and Circular families are listed in Extended's source but
+**not available in v6's `EasingFunctions`** — do not use them. The families above are confirmed working.
 
 **Golden rule**: for UI hover/press animations prefer `ElasticOut` or `BackOut` — they
 overshoot slightly and snap back, giving the illusion of physical weight. For panel

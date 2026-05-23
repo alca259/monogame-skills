@@ -211,7 +211,9 @@ tileLayer.SetTile(col, row, null);  // clear
 ## Anti-Patterns
 
 - **Never** import from `MonoGame.Extended.Tiled` — that namespace is removed in v6.
-  The class `TiledMap` and renderer `TiledMapRenderer` do not exist in v6.
+  The Extended classes `TiledMap` and `TiledMapRenderer` do not exist in v6.
+  Note: the project provides its own `Alca.MonoGame.Kernel.Graphics.Tiled.TiledMapRenderer`
+  wrapper (different class, different namespace) — that one is correct and wraps `TilemapSpriteBatchRenderer`.
 - **Never** pass a raw `Matrix` to `TilemapSpriteBatchRenderer.Draw` — it requires
   `OrthographicCamera`.
 - **Never** call `_renderer.Draw` while a `SpriteBatch` is still open (`Begin` without

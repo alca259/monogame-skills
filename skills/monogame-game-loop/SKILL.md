@@ -125,6 +125,58 @@ if (_isPaused && !_inputChanged)
     SuppressDraw();
 ```
 
+## Core Base Class (Alca.MonoGame.Kernel)
+
+Rather than inheriting from `Game` directly, derive from `Core` — the library's singleton that wires up all subsystems automatically.
+
+```csharp
+public sealed class MyGame : Core
+{
+    // Core constructor: title, width, height, fullScreen
+    public MyGame() : base("My Game", 1920, 1080, false) { }
+
+    // Optional hooks (called in order: PreInitialize → ConfigureServices → PostInitialize):
+    protected override void PreInitialize() { /* pre-subsystem setup */ }
+
+    protected override void ConfigureServices(IServiceCollection services)
+    {
+        services.AddSingleton<IMyService, MyService>();
+    }
+
+    protected override void PostInitialize()
+    {
+        Core.SceneManager.RequestChange(new MainMenuScene());
+    }
+}
+```
+
+`Core` wires the game loop, boots all subsystems, and handles:
+- **F11** — toggle fullscreen
+- **Escape** — exit the game if `Core.ExitOnEscape == true`
+
+### Static Service Accessors
+
+All subsystems are available as static properties on `Core`:
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `Core.Instance` | `Core` | The singleton game instance |
+| `Core.Input` | `InputManager` | Keyboard / mouse / gamepad |
+| `Core.Audio` | `AudioController` | Sound effects and music |
+| `Core.SceneManager` | `SceneManager` | Scene push/pop/change |
+| `Core.UIInteraction` | `UIInteractionManager` | Pointer event routing |
+| `Core.UIFocus` | `UIFocusManager` | Keyboard focus tracking |
+| `Core.UIOverlay` | `UIOverlayManager` | Overlay panel rendering |
+| `Core.Localization` | `LocalizationManager` | Localized strings |
+| `Core.Tweening` | tween engine | MonoGame.Extended tweening |
+| `Core.Resolution` | resolution manager | Virtual resolution & scale |
+| `Core.Platform` | platform info | Platform detection |
+| `Core.SpriteBatch` | `SpriteBatch` | Shared sprite batch |
+| `Core.GraphicsDevice` | `GraphicsDevice` | Graphics device |
+| `Core.Content` | `ContentManager` | Root content manager |
+
+These are safe to access from any scene or component after `PostInitialize()` completes.
+
 ## Rules
 
 - Use the `float delta` accumulator pattern for all timers — never `DateTime.Now`.

@@ -5,7 +5,7 @@ description: MonoGame UI XAML-style Grid layout — row and column definitions w
 
 # MonoGame UI Grid Layout
 
-The `UIGrid` container positions children at explicit row/column coordinates — identical to XAML's `Grid`. It is the most flexible layout container for complex UIs (settings screens, inventory tables, form layouts). For complete code templates, read `references/ui-grid.md`.
+The `GridLayout` container positions children at explicit row/column coordinates — identical to XAML's `Grid`. It is the most flexible layout container for complex UIs (settings screens, inventory tables, form layouts). For complete code templates, read `references/ui-grid.md`.
 
 ## Assumed Contract
 
@@ -13,44 +13,45 @@ Extends `UIContainer` from `monogame-ui-core`. Implements `Measure`/`Arrange` fr
 
 ## Column and Row Definitions
 
-Three sizing modes, same as XAML:
+Three sizing modes, same as XAML. Use the static shorthand methods on `GridTrack`:
 
 | Mode | Syntax | Behavior |
 |------|--------|---------|
-| Fixed | `GridLength.Pixel(n)` | Exact pixel size |
-| Auto | `GridLength.Auto` | Sized to the widest/tallest child in that column/row |
-| Star | `GridLength.Star(n)` | Proportional share of remaining space after fixed + auto |
+| Fixed | `GridTrack.Fixed(n)` | Exact pixel size |
+| Auto | `GridTrack.Auto()` | Sized to the widest/tallest child in that column/row |
+| Star | `GridTrack.Star(n)` | Proportional share of remaining space after fixed + auto |
 
-Examples:
+Add tracks to `ColumnDefinitions` / `RowDefinitions` before arranging children:
+
 ```csharp
-var grid = new UIGrid();
-grid.AddColumn(GridLength.Pixel(120));  // fixed 120px label column
-grid.AddColumn(GridLength.Star(1));     // remaining width → inputs
-grid.AddRow(GridLength.Auto);           // as tall as the tallest child
-grid.AddRow(GridLength.Auto);
-grid.AddRow(GridLength.Pixel(40));      // fixed footer row
+var grid = new GridLayout();
+grid.ColumnDefinitions.Add(GridTrack.Fixed(120));   // fixed 120px label column
+grid.ColumnDefinitions.Add(GridTrack.Star(1));      // remaining width → inputs
+grid.RowDefinitions.Add(GridTrack.Auto());          // as tall as the tallest child
+grid.RowDefinitions.Add(GridTrack.Auto());
+grid.RowDefinitions.Add(GridTrack.Fixed(40));       // fixed footer row
 ```
 
 ## Placing Children
 
-Children are placed with attached properties via `UIGrid.SetCell(child, row, col)`:
+Children are placed with `SetCell(child, row, col)` — an **instance method** on `GridLayout`:
 
 ```csharp
-var nameLabel = new Label(font) { Text = "Name:" };
-UIGrid.SetCell(nameLabel, row: 0, col: 0);
+var nameLabel = new Label { Text = "Name:" };
+grid.SetCell(nameLabel, row: 0, col: 0);
 grid.Add(nameLabel);
 
-var nameInput = new UITextBox(font, pixel);
-UIGrid.SetCell(nameInput, row: 0, col: 1);
+var nameInput = new TextBox(font, pixel, Window);
+grid.SetCell(nameInput, row: 0, col: 1);
 grid.Add(nameInput);
 ```
 
-`SetCell` stores `row`, `col`, `rowSpan`, `colSpan` as metadata on the child (via a dictionary or child-level fields in a partial class / wrapper).
+`SetCell` stores `row`, `col`, `rowSpan`, `colSpan` in an internal dictionary keyed by child.
 
 ## Column/Row Span
 
 ```csharp
-UIGrid.SetCell(titleLabel, row: 0, col: 0, rowSpan: 1, colSpan: 2);  // spans both columns
+grid.SetCell(titleLabel, row: 0, col: 0, rowSpan: 1, colSpan: 2);  // spans both columns
 ```
 
 ## Measure Algorithm
@@ -97,15 +98,22 @@ Bottom-right: score
 
 ## Cell Alignment
 
-After the cell rectangle is computed, children can align within it using `HorizontalAlignment` and `VerticalAlignment` (stretch, left, center, right / top, center, bottom). By default, children stretch to fill their cell.
+After the cell rectangle is computed, children can align within it using `CellHAlign` (`HAlign`) and `CellVAlign` (`VAlign`) properties on the `GridLayout`:
+
+```csharp
+grid.CellHAlign = HAlign.Center;
+grid.CellVAlign = VAlign.Middle;
+```
+
+Default is `HAlign.Left` / `VAlign.Top` which stretches children to fill their cell.
 
 ## Anti-Patterns
 
 - Never use LINQ or `foreach` inside `Measure` or `Arrange` — indexed `for` loops only.
 - Never manually position children by pixel offset when the grid would handle it — let Arrange assign `Bounds`.
-- Do not rebuild `ColumnDefinitions` or `RowDefinitions` every frame — modify them only when the layout needs to change, then set `LayoutDirty = true`.
+- Do not rebuild `ColumnDefinitions` or `RowDefinitions` every frame — modify them only when the layout needs to change, then call `Invalidate()`.
 - Do not span a child past the grid's column/row count — clamp spans in `SetCell`.
 
 ## Reference
 
-Complete `UIGrid`, `GridLength`, `GridCellInfo`, and `Measure`/`Arrange` implementations: `references/ui-grid.md`.
+Complete `GridLayout`, `GridTrack`, `GridSizeMode`, and `Measure`/`Arrange` implementations: `references/ui-grid.md`.

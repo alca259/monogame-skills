@@ -26,20 +26,23 @@ Expanded state:
   └────────────────────┘
 ```
 
-The overlay list is not part of the normal layout tree. It is drawn by a root-level `UIDropdownOverlay` manager after the entire UI tree is drawn — this ensures it appears above sibling panels.
+The overlay list is not part of the normal layout tree. It is drawn by `UIOverlayManager` after the entire UI tree is drawn — this ensures it appears above sibling panels.
 
 ## Overlay Management
 
 Never place the expanded list as a child of the dropdown itself — it would be clipped by any parent scissor rectangle and drawn at the wrong Z-order.
 
-Use a static `UIOverlayManager` (or pass a reference to the root container) and register/unregister the dropdown's open list with it:
+Inject `UIOverlayManager` into the constructor — do not use it as a static. The dropdown holds a reference to an overlay `UIPanel` and calls `Show`/`Hide` on the manager:
 
 ```csharp
+// Constructor — UIOverlayManager is injected (usually via Core.UIOverlay):
+var dropdown = new Dropdown(Core.UIOverlay);
+
 // When dropdown opens:
-UIOverlayManager.Register(this);   // dropdown draws its list in the overlay pass
+_overlayManager.Show(_listPanel);   // panel draws on top of everything
 
 // When dropdown closes:
-UIOverlayManager.Unregister(this);
+_overlayManager.Hide(_listPanel);
 ```
 
 The root `Game.Draw()` calls `UIOverlayManager.Draw(spriteBatch)` after `_uiRoot.Draw(spriteBatch)`.
@@ -83,4 +86,4 @@ Add string items via `AddItem(string text)`. For rich items (icon + label), pass
 
 ## Reference
 
-Complete `UIDropdown`, `UIOverlayManager`, and overlay draw pattern: `references/ui-dropdown.md`.
+Complete `Dropdown`, `UIOverlayManager`, and overlay draw pattern: `references/ui-dropdown.md`.
