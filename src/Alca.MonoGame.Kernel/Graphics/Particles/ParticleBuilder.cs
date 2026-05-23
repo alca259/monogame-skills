@@ -1,6 +1,7 @@
 using MonoGame.Extended;
 using MonoGame.Extended.Graphics;
 using MonoGame.Extended.Particles;
+using MonoGame.Extended.Particles.Data;
 using MonoGame.Extended.Particles.Modifiers;
 using MonoGame.Extended.Particles.Modifiers.Interpolators;
 using MonoGame.Extended.Particles.Profiles;
@@ -47,7 +48,7 @@ public sealed class ParticleBuilder
     /// <summary>Configures a circle emission profile with outward radiation.</summary>
     public ParticleBuilder WithCircleProfile(float radius)
     {
-        _profile = Profile.Circle(radius, CircleRadiation.In);
+        _profile = Profile.Circle(radius, CircleRadiation.Out);
         return this;
     }
 
@@ -88,9 +89,9 @@ public sealed class ParticleBuilder
             Profile = _profile,
             TextureRegion = _textureRegion!,
             LifeSpan = avgLifetime,
-            Parameters = new global::MonoGame.Extended.Particles.Data.ParticleReleaseParameters
+            Parameters = new ParticleReleaseParameters
             {
-                Speed = new global::MonoGame.Extended.Particles.Data.ParticleFloatParameter(_speed)
+                Speed = new ParticleFloatParameter(_speed)
             }
         };
 

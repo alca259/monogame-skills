@@ -7,6 +7,15 @@ public sealed class ParticleEffectWrapper
 {
     private ParticleEffect? _effect;
 
+    /// <summary>Initializes a new empty wrapper. Call <see cref="LoadFromFile"/> before using.</summary>
+    public ParticleEffectWrapper() { }
+
+    /// <summary>Initializes the wrapper with an already-constructed effect (used for testing).</summary>
+    internal ParticleEffectWrapper(ParticleEffect effect)
+    {
+        _effect = effect;
+    }
+
     /// <summary>Gets the underlying ParticleEffect, or null if not yet loaded.</summary>
     public ParticleEffect? Effect => _effect;
 
