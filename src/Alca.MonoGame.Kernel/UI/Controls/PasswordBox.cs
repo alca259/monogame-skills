@@ -51,6 +51,14 @@ public sealed class PasswordBox : TextBoxBase
         _cachedMaskedBeforeCursor = safeIdx > 0 ? new string(_maskChar, safeIdx) : string.Empty;
     }
 
+    /// <inheritdoc/>
+    protected override void OnCursorCacheRebuilt()
+    {
+        // Rebuild masked before-cursor string when cursor moves without text change.
+        int safeIdx = Math.Min(_cursorIndex, _text.Length);
+        _cachedMaskedBeforeCursor = safeIdx > 0 ? new string(_maskChar, safeIdx) : string.Empty;
+    }
+
     #endregion
 
     #region Layout / Draw

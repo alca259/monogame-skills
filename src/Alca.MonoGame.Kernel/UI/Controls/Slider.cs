@@ -7,10 +7,6 @@ namespace Alca.MonoGame.Kernel.UI.Controls;
 /// <summary>A draggable slider that lets the user pick a float value in a [MinValue, MaxValue] range.</summary>
 public sealed class Slider : UIElement, IUIInteractable, IFocusable
 {
-    #region Constants
-
-    #endregion
-
     #region Fields
 
     private bool _isDragging;
@@ -71,6 +67,7 @@ public sealed class Slider : UIElement, IUIInteractable, IFocusable
             float snapped = Step > 0f ? MathF.Round(clamped / Step) * Step : clamped;
             if (MathF.Abs(snapped - _value) < 0.0001f) return;
             _value = snapped;
+            UpdateThumbRects();
             ValueChanged?.Invoke(_value);
         }
     }
