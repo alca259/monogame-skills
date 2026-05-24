@@ -16,6 +16,16 @@ public sealed class MoveEntityCommand : IEditorCommand
         _newPosition = newPosition;
     }
 
+    /// <param name="target">Object to move.</param>
+    /// <param name="previousPosition">Position before the move (explicit, used by gizmo drag).</param>
+    /// <param name="newPosition">Target position.</param>
+    public MoveEntityCommand(EditorGameObject target, EditorVector2 previousPosition, EditorVector2 newPosition)
+    {
+        _target = target;
+        _previousPosition = previousPosition;
+        _newPosition = newPosition;
+    }
+
     /// <inheritdoc/>
     public string Description => $"Move '{_target.Name}'";
 

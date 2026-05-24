@@ -96,6 +96,7 @@ interface IEditorEventBus
 Eventos tipados:
 - `GameObjectSelectedEvent` — objeto seleccionado en jerarquía o viewport
 - `SceneLoadedEvent` — escena cargada o cambiada
+- `ProjectOpenedEvent` — proyecto abierto o cerrado
 - `AssetImportedEvent` — asset nuevo detectado por FileWatcher
 - `BehaviourAddedEvent` — behaviour adjuntado a un game object
 - `UndoPerformedEvent` / `RedoPerformedEvent` — actualiza menú Edit
@@ -124,13 +125,29 @@ sealed class EditorPreferences
 sealed class EditorProject
 {
     string Name { get; }
-    string RootPath { get; }
-    string ContentPath { get; }       // Content/
-    string ScenesPath { get; }        // Scenes/
-    string PrefabsPath { get; }       // Content/Prefabs/
-    string LocalizationPath { get; }  // Localization/
+    string RootPath { get; }         // raíz del proyecto (donde vive el .sln/.slnx)
+    string EditorPath { get; }       // {RootPath}/Editor/   ← todos los ficheros del editor
+    string ScenesPath { get; }       // {EditorPath}/Scenes/
+    string PrefabsPath { get; }      // {EditorPath}/Prefabs/
+    string ContentPath { get; }      // configurable; default {RootPath}/Content
+    string LocalizationPath { get; } // configurable; default {RootPath}/Localization
 }
 ```
+
+**Fichero descriptor:** `{RootPath}/Editor/project.json`
+```json
+{
+  "name": "MyGame",
+  "version": "1.0",
+  "contentPath": "Content",
+  "localizationPath": "Localization"
+}
+```
+
+**Apertura de proyectos existentes:** si la carpeta seleccionada no tiene `Editor/project.json` pero contiene un `.sln`/`.slnx`, el editor ofrece inicializarlo: crea `Editor/` con su descriptor y crea las carpetas estándar faltantes sin tocar nada existente.
+
+Eventos tipados adicionales:
+- `ProjectOpenedEvent` — proyecto abierto o cerrado
 
 **Reusar del Kernel:** `EventBus` como implementación base de `IEditorEventBus`.
 
@@ -675,10 +692,11 @@ Editor de localización integrado con `LocalizationManager`. Configuración de p
 - Formato JSON plano `{ "key": "valor" }` con soporte de namespaces por punto
 - Guardar con Ctrl+S
 
-### Project Settings (`project.json`)
+### Project Settings (`Editor/project.json`)
 
 | Sección | Propiedades | Kernel |
 |---------|------------|--------|
+| Paths | ContentPath, LocalizationPath | — |
 | Resolution | VirtualWidth, VirtualHeight, Letterbox mode | `ResolutionManager` |
 | Window | Title, FullScreen, WindowMode | `PlatformManager` |
 | Localization | DefaultLocale, AvailableLocales | `LocalizationManager` |
@@ -687,6 +705,11 @@ Editor de localización integrado con `LocalizationManager`. Configuración de p
 | Tweening | DefaultDuration, DefaultEasing | `TweeningManager` |
 | Grid | CellSize, SnapEnabled | `GizmoRenderer` (Fase 4) |
 | Build | OutputPath, DefaultPlatform | `PlatformManager` |
+
+**Sección Paths** — editable en Project Settings (rutas relativas al `RootPath`):
+- `ContentPath`: selector de carpeta; apunta a la carpeta de assets del juego (default `Content`)
+- `LocalizationPath`: selector de carpeta; apunta a los ficheros JSON de localización (default `Localization`)
+- Al cambiar cualquier ruta, el editor recarga el `AssetBrowserPanel` y el panel de traducciones
 
 ---
 
@@ -781,21 +804,22 @@ MyGame/
 ├── src/
 │   ├── MyGame.csproj             # Referencia a Alca.MonoGame.Kernel
 │   ├── Game.cs
-│   ├── Behaviours/               # Generado por CodeGen, editado por el usuario
-│   └── Scenes/                   # .json versionables con git
-├── Content/
+│   └── Behaviours/               # Generado por CodeGen, editado por el usuario
+├── Content/                      # Ruta configurable en Editor/project.json
 │   ├── Content.mgcb
 │   ├── Textures/
 │   ├── Audio/
 │   ├── Fonts/
 │   ├── Maps/
-│   ├── Prefabs/                  # .prefab.json
 │   ├── Particles/                # .particles.json
 │   └── Animations/               # .anim.json
-├── Localization/
+├── Localization/                 # Ruta configurable en Editor/project.json
 │   ├── es.json
 │   └── en.json
-└── project.json                  # Project Settings del editor
+└── Editor/                       # Ficheros del editor (ignorable en .gitignore si se desea)
+    ├── project.json              # Descriptor + Project Settings
+    ├── Scenes/                   # .json versionables con git
+    └── Prefabs/                  # .prefab.json
 ```
 
 ---

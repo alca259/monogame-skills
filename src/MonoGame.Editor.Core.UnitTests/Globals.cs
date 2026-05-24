@@ -2,6 +2,7 @@ global using MonoGame.Editor.Core;
 global using MonoGame.Editor.Core.Attributes;
 global using MonoGame.Editor.Core.Commands;
 global using MonoGame.Editor.Core.Events;
+global using MonoGame.Editor.Core.Gizmos;
 global using MonoGame.Editor.Core.Models;
 global using MonoGame.Editor.Core.Preferences;
 global using MonoGame.Editor.Core.Project;

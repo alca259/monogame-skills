@@ -128,11 +128,13 @@ public sealed class EditorContext
         EventBus.Publish(new SceneLoadedEvent(scene));
     }
 
-    /// <summary>Sets the active project (does not publish an event).</summary>
+    /// <summary>Sets the active project and publishes <see cref="ProjectOpenedEvent"/>.</summary>
     public void SetActiveProject(EditorProject? project)
     {
         lock (_stateLock)
             _activeProject = project;
+
+        EventBus.Publish(new ProjectOpenedEvent(project));
     }
 
     #endregion

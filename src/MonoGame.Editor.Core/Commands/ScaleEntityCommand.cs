@@ -16,6 +16,16 @@ public sealed class ScaleEntityCommand : IEditorCommand
         _newScale = newScale;
     }
 
+    /// <param name="target">Object to scale.</param>
+    /// <param name="previousScale">Scale before the change (explicit, used by gizmo drag).</param>
+    /// <param name="newScale">Target scale.</param>
+    public ScaleEntityCommand(EditorGameObject target, EditorVector2 previousScale, EditorVector2 newScale)
+    {
+        _target = target;
+        _previousScale = previousScale;
+        _newScale = newScale;
+    }
+
     /// <inheritdoc/>
     public string Description => $"Scale '{_target.Name}'";
 
