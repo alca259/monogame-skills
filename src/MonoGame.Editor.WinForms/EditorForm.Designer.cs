@@ -13,6 +13,9 @@ partial class EditorForm
     private ToolStripSeparator _fileSeparator = null!;
     private ToolStripMenuItem _exitItem = null!;
     private ToolStripMenuItem _editMenu = null!;
+    private ToolStripMenuItem _undoMenuItem = null!;
+    private ToolStripMenuItem _redoMenuItem = null!;
+    private ToolStripSeparator _editSeparator1 = null!;
     private ToolStripMenuItem _viewMenu = null!;
     private ToolStripMenuItem _viewHierarchyMenuItem = null!;
     private ToolStripMenuItem _viewInspectorMenuItem = null!;
@@ -75,6 +78,9 @@ partial class EditorForm
         _fileSeparator            = new ToolStripSeparator();
         _exitItem                 = new ToolStripMenuItem();
         _editMenu                 = new ToolStripMenuItem();
+        _undoMenuItem             = new ToolStripMenuItem();
+        _redoMenuItem             = new ToolStripMenuItem();
+        _editSeparator1           = new ToolStripSeparator();
         _viewMenu                 = new ToolStripMenuItem();
         _viewHierarchyMenuItem    = new ToolStripMenuItem();
         _viewInspectorMenuItem    = new ToolStripMenuItem();
@@ -164,9 +170,32 @@ partial class EditorForm
         _exitItem.Click += OnFileExitClick;
 
         // _editMenu
+        _editMenu.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { _undoMenuItem, _redoMenuItem, _editSeparator1 });
         _editMenu.Name = "_editMenu";
         _editMenu.Size = new System.Drawing.Size(39, 20);
         _editMenu.Text = "Edit";
+
+        // _undoMenuItem
+        _undoMenuItem.Enabled      = false;
+        _undoMenuItem.Name         = "_undoMenuItem";
+        _undoMenuItem.ShortcutKeys = System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.Z;
+        _undoMenuItem.ShowShortcutKeys = true;
+        _undoMenuItem.Size         = new System.Drawing.Size(180, 22);
+        _undoMenuItem.Text         = "Undo";
+        _undoMenuItem.Click        += OnUndoClick;
+
+        // _redoMenuItem
+        _redoMenuItem.Enabled      = false;
+        _redoMenuItem.Name         = "_redoMenuItem";
+        _redoMenuItem.ShortcutKeys = System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.Y;
+        _redoMenuItem.ShowShortcutKeys = true;
+        _redoMenuItem.Size         = new System.Drawing.Size(180, 22);
+        _redoMenuItem.Text         = "Redo";
+        _redoMenuItem.Click        += OnRedoClick;
+
+        // _editSeparator1
+        _editSeparator1.Name = "_editSeparator1";
+        _editSeparator1.Size = new System.Drawing.Size(177, 6);
 
         // _viewMenu
         _viewMenu.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { _viewHierarchyMenuItem, _viewInspectorMenuItem, _viewAssetBrowserMenuItem, _viewConsoleMenuItem, _viewMenuSeparator1, _resetLayoutMenuItem });

@@ -5,13 +5,15 @@ public sealed partial class EditorForm : Form
 {
     private readonly EditorContext _context = null!;
     private readonly EditorPreferences _preferences = null!;
+    private readonly GameObjectRegistry _registry = null!;
 
     /// <summary>Designer-only constructor.</summary>
     public EditorForm() => InitializeComponent();
 
     public EditorForm(EditorContext context)
     {
-        _context = context;
+        _context   = context;
+        _registry  = new GameObjectRegistry();
         _preferences = new EditorPreferences();
         _preferences.Load();
 
@@ -58,11 +60,21 @@ public sealed partial class EditorForm : Form
 
     private void WireEvents()
     {
-        Shown += (_, _) => { ApplyPreferences(); CenterPlaybackStrip(); };
+        Shown  += (_, _) => { ApplyPreferences(); CenterPlaybackStrip(); _registry.Scan(); };
+        KeyPreview = true;
+        KeyDown    += OnFormKeyDown;
+
         _context.EventBus.Subscribe<EditorStateChangedEvent>(OnEditorStateChanged);
+        _context.EventBus.Subscribe<UndoPerformedEvent>(OnUndoPerformed);
+        _context.EventBus.Subscribe<RedoPerformedEvent>(OnRedoPerformed);
+
         FormClosing += (_, _) => SavePreferences();
         _viewport.RenderFrame += OnViewportRenderFrame;
-        _toolbarTable.Resize += (_, _) => CenterPlaybackStrip();
+        _toolbarTable.Resize  += (_, _) => CenterPlaybackStrip();
+
+        // Initialize panels
+        _hierarchyPanel.Initialize(_context);
+        _inspectorPanel.Initialize(_context, _registry);
     }
 
     private void SavePreferences()
@@ -81,7 +93,27 @@ public sealed partial class EditorForm : Form
     protected override void OnFormClosed(FormClosedEventArgs e)
     {
         _context.EventBus.Unsubscribe<EditorStateChangedEvent>(OnEditorStateChanged);
+        _context.EventBus.Unsubscribe<UndoPerformedEvent>(OnUndoPerformed);
+        _context.EventBus.Unsubscribe<RedoPerformedEvent>(OnRedoPerformed);
         base.OnFormClosed(e);
+    }
+
+    #endregion
+
+    #region Keyboard shortcuts
+
+    private void OnFormKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Control && e.KeyCode == Keys.Z)
+        {
+            _context.Commands.Undo();
+            e.Handled = true;
+        }
+        else if (e.Control && e.KeyCode == Keys.Y)
+        {
+            _context.Commands.Redo();
+            e.Handled = true;
+        }
     }
 
     #endregion
@@ -190,6 +222,42 @@ public sealed partial class EditorForm : Form
         _innerSplit.SplitterDistance = ClampSplitter(_innerSplit.Width - defaults.RightPanelWidth, 320, _innerSplit.Width - 220);
         _mainSplit.SplitterDistance  = ClampSplitter(_mainSplit.Height - defaults.ConsolePanelHeight, 240, _mainSplit.Height - 80);
         _assetBrowserPanel.SplitterDistance = defaults.AssetBrowserSplitterDistance;
+    }
+
+    #endregion
+
+    #region Menu — Edit (Undo / Redo)
+
+    private void OnUndoClick(object? sender, EventArgs e)
+    {
+        _context.Commands.Undo();
+    }
+
+    private void OnRedoClick(object? sender, EventArgs e)
+    {
+        _context.Commands.Redo();
+    }
+
+    private void OnUndoPerformed(UndoPerformedEvent _)
+    {
+        if (InvokeRequired) { BeginInvoke(UpdateEditMenu); return; }
+        UpdateEditMenu();
+    }
+
+    private void OnRedoPerformed(RedoPerformedEvent _)
+    {
+        if (InvokeRequired) { BeginInvoke(UpdateEditMenu); return; }
+        UpdateEditMenu();
+    }
+
+    private void UpdateEditMenu()
+    {
+        string? undoDesc = _context.Commands.UndoDescription;
+        string? redoDesc = _context.Commands.RedoDescription;
+        _undoMenuItem.Text    = undoDesc is null ? "Undo" : $"Undo {undoDesc}";
+        _redoMenuItem.Text    = redoDesc is null ? "Redo" : $"Redo {redoDesc}";
+        _undoMenuItem.Enabled = undoDesc is not null;
+        _redoMenuItem.Enabled = redoDesc is not null;
     }
 
     #endregion

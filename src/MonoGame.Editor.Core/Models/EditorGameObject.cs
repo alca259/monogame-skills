@@ -27,6 +27,7 @@ public sealed class EditorGameObject
     /// <summary>Child objects in the hierarchy.</summary>
     public List<EditorGameObject> Children { get; } = [];
 
-    /// <summary>Parent object, or <c>null</c> if this is a root object.</summary>
+    /// <summary>Parent object, or <c>null</c> if this is a root object. Excluded from serialization to avoid circular references.</summary>
+    [JsonIgnore]
     public EditorGameObject? Parent { get; set; }
 }

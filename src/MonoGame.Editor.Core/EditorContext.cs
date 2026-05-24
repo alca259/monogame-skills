@@ -41,12 +41,16 @@ public sealed class EditorContext
     public EditorContext(IEditorEventBus eventBus)
     {
         EventBus = eventBus;
+        Commands = new CommandStack(100, eventBus);
     }
 
     #region Properties
 
     /// <summary>The shared event bus for this context.</summary>
     public IEditorEventBus EventBus { get; }
+
+    /// <summary>Undo/redo history for all editor operations.</summary>
+    public CommandStack Commands { get; }
 
     /// <summary>Current editor state (Editing, Playing, or Paused).</summary>
     public EditorState State { get { lock (_stateLock) return _state; } }
