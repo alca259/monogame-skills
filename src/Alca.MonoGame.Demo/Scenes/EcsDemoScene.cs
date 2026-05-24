@@ -6,6 +6,9 @@ namespace Alca.MonoGame.Demo.Scenes;
 /// </summary>
 public sealed class EcsDemoScene : Scene
 {
+    private readonly UIRoot _uiRoot = new();
+    private readonly UIInteractionManager _interactionManager = new();
+
     private SpriteFont? _font;
     private readonly GameWorld _world = new();
     private GameEntity _parentEntity = null!;
@@ -22,6 +25,18 @@ public sealed class EcsDemoScene : Scene
 
         _parentTexture = CreateCircleTexture(Core.GraphicsDevice, 24);
         _childTexture = CreateCircleTexture(Core.GraphicsDevice, 14);
+
+        if (_font is not null)
+            BuildUI();
+    }
+
+    private void BuildUI()
+    {
+        var root = new StackPanel { Orientation = Orientation.Vertical, Spacing = 8 };
+        var backBtn = new Button(_font!, "← Menú");
+        backBtn.Clicked += () => Core.SceneManager.RequestChange(Core.GetService<UIScene_Menu>());
+        root.Add(backBtn);
+        _uiRoot.Add(root);
     }
 
     protected override void PostInitialize()
@@ -43,8 +58,11 @@ public sealed class EcsDemoScene : Scene
 
         _world.Update(gameTime);
 
-        if (Core.Input.IsKeyReleased(Keys.Space))
-            Core.SceneManager.RequestChange(Core.GetService<UIDemoScene>());
+        _uiRoot.Update(gameTime);
+        Rectangle screen = new(0, 0, Core.GraphicsDevice.Viewport.Width, Core.GraphicsDevice.Viewport.Height);
+        _uiRoot.Measure(new Vector2(screen.Width, screen.Height));
+        _uiRoot.Arrange(screen);
+        _interactionManager.Update(_uiRoot, Core.Input.Mouse);
     }
 
     public override void Draw(GameTime gameTime)
@@ -64,10 +82,11 @@ public sealed class EcsDemoScene : Scene
             Core.SpriteBatch.DrawString(_font, $"Parent world pos: {parentPos.X:F0}, {parentPos.Y:F0}", new Vector2(20, 50), Color.LightGreen);
             Core.SpriteBatch.DrawString(_font, $"Child world pos:  {childPos.X:F0}, {childPos.Y:F0}", new Vector2(20, 75), Color.LightBlue);
             Core.SpriteBatch.DrawString(_font, $"Child local pos:  {_childEntity.Transform.LocalPosition.X:F0}, {_childEntity.Transform.LocalPosition.Y:F0}", new Vector2(20, 100), Color.LightYellow);
-            Core.SpriteBatch.DrawString(_font, "Press [Space] to switch to UI Demo", new Vector2(20, 140), Color.LightGray);
         }
 
         Core.SpriteBatch.End();
+
+        _uiRoot.DrawAll(Core.SpriteBatch);
     }
 
     protected override void Dispose(bool disposing)
