@@ -167,7 +167,7 @@ public static bool TryCreatePlaneFromPolygon(ReadOnlySpan<Vector3> vertices, out
 
 Añadir a `Alca.MonoGame.Kernel.csproj`:
 ```xml
-<PackageReference Include="tainicom.Aether.Physics2D" Version="2.*" />
+<PackageReference Include="Aether.Physics2D" Version="2.2.*" />
 ```
 
 ---
