@@ -12,17 +12,27 @@ public sealed class EcsDemoScene : Scene
     private GameEntity _childEntity = null!;
     private float _angle;
 
+    private Texture2D _parentTexture = null!;
+    private Texture2D _childTexture = null!;
+
     public override void LoadContent()
     {
         try { _font = Content.Load<SpriteFont>("DefaultFont"); }
         catch { /* No font available */ }
+
+        _parentTexture = CreateCircleTexture(Core.GraphicsDevice, 24);
+        _childTexture = CreateCircleTexture(Core.GraphicsDevice, 14);
     }
 
     protected override void PostInitialize()
     {
         base.PostInitialize();
+
         _parentEntity = _world.CreateEntity("Parent", new Vector2(640, 360));
+        _parentEntity.Add(new SpriteRendererBehaviour(_parentTexture) { Color = Color.Yellow });
+
         _childEntity = _world.CreateEntity("Child", new Vector2(100, 0));
+        _childEntity.Add(new SpriteRendererBehaviour(_childTexture) { Color = Color.Cyan });
         _childEntity.SetParent(_parentEntity);
     }
 
@@ -43,6 +53,8 @@ public sealed class EcsDemoScene : Scene
 
         Core.SpriteBatch.Begin();
 
+        _world.Draw(gameTime, Core.SpriteBatch);
+
         if (_font is not null)
         {
             var parentPos = _parentEntity.Transform.Position;
@@ -56,7 +68,38 @@ public sealed class EcsDemoScene : Scene
         }
 
         Core.SpriteBatch.End();
+    }
 
-        _world.Draw(gameTime, Core.SpriteBatch);
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _parentTexture?.Dispose();
+            _childTexture?.Dispose();
+        }
+        base.Dispose(disposing);
+    }
+
+    private static Texture2D CreateCircleTexture(GraphicsDevice device, int radius)
+    {
+        int diameter = radius * 2;
+        var texture = new Texture2D(device, diameter, diameter);
+        var data = new Color[diameter * diameter];
+        float radiusSq = (radius - 1f) * (radius - 1f);
+        float cx = radius - 0.5f;
+        float cy = radius - 0.5f;
+
+        for (int y = 0; y < diameter; y++)
+        {
+            for (int x = 0; x < diameter; x++)
+            {
+                float dx = x - cx;
+                float dy = y - cy;
+                data[y * diameter + x] = dx * dx + dy * dy <= radiusSq ? Color.White : Color.Transparent;
+            }
+        }
+
+        texture.SetData(data);
+        return texture;
     }
 }
