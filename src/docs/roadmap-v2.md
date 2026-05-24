@@ -232,14 +232,151 @@ Añadir a `Alca.MonoGame.Kernel.csproj`:
 
 ---
 
-## FASE 9+ — Por Definir
+## FASE 9.x — Sistema de Iluminación 2D 🔜 PENDIENTE
+
+> **Objetivo:** Iluminación global y local para escenas 2D — luz ambiental, direccional, puntual y cono — como `GameBehaviour` adjunto a `GameEntity`, con un servicio `LightingWorld` que agrega contribuciones sin allocations en el game loop.
+
+---
+
+### Milestone 9.x.1 — LightBehaviour (base)
+
+**`Lighting/LightBehaviour.cs`** — `abstract class LightBehaviour : GameBehaviour`
+
+- `Color` (Color, default `Color.White`)
+- `Intensity` (float, rango 0–1, default 1)
+- `LightingLayer` (LightingLayer, default `World`)
+- `Range` (float) — radio de influencia; 0 = sin límite (luz direccional / ambiental)
+- `IsContributing` — computed: `Active && Intensity > 0`
+- `abstract void Contribute(LightContribution accumulator)` — cada subclase implementa su propia contribución
+
+> `LightContribution` es un `struct` — sin alloc en Update.
+
+---
+
+### Milestone 9.x.2 — Tipos de luz
+
+**`Lighting/AmbientLight.cs`** — `sealed class AmbientLight : LightBehaviour`
+
+- Sin propiedades extra.
+- Contribuye un color base uniforme a toda la escena.
+- Caso de uso: iluminación de fondo (cielo de día, noche oscura, interior neutro).
+
+**`Lighting/DirectionalLight2D.cs`** — `sealed class DirectionalLight2D : LightBehaviour`
+
+- `Direction` (Vector2) — dirección de la luz; toma por defecto `Transform.Right`
+- Iluminación uniforme en toda la escena, sin atenuación por distancia.
+- Caso de uso: sol, luna, luz cenital de nivel.
+
+**`Lighting/PointLight2D.cs`** — `sealed class PointLight2D : LightBehaviour`
+
+- `Range` (float) — radio de influencia
+- `FalloffExponent` (float, default 2.0) — curva de atenuación: `1 - (dist / range) ^ falloff`
+- Posición tomada de `Transform.Position2d`
+- Caso de uso: antorcha, lámpara, explosión, fuego de campamento.
+
+**`Lighting/SpotLight2D.cs`** — `sealed class SpotLight2D : LightBehaviour`
+
+- `Range` (float)
+- `InnerAngle` (float, grados) — cono interno con intensidad máxima
+- `OuterAngle` (float, grados) — cono de degradado suave
+- `Direction` (Vector2) — tomada de `Transform.Right` o sobreescrita manualmente
+- Caso de uso: linterna, foco de escenario, cono de visión enemigo.
+
+---
+
+### Milestone 9.x.3 — LightContribution (struct)
+
+**`Lighting/LightContribution.cs`** — `readonly struct LightContribution`
+
+```csharp
+public readonly struct LightContribution
+{
+    public Color Accumulated { get; }
+    public void Add(Color color, float weight); // Color.Lerp(acc, color, weight)
+}
+```
+
+- Sin heap allocation.
+- Usado internamente por `LightingWorld.Resolve()`.
+
+---
+
+### Milestone 9.x.4 — LightingLayer (enum)
+
+**`Lighting/LightingLayer.cs`** — `enum LightingLayer`
+
+- Valores sugeridos: `World`, `UI`, `Underground`, `Overlay`
+- Permite aislar grupos de luces por capa lógica.
+- `LightingWorld.Resolve()` y `GetLightsInRange()` filtran por layer.
+
+---
+
+### Milestone 9.x.5 — LightingWorld
+
+**`Lighting/LightingWorld.cs`** — `sealed class LightingWorld`
+
+- `_lights` (List<LightBehaviour>, capacidad 32 pre-allocated) — sin LINQ en Update
+- `Register(LightBehaviour)`, `Unregister(LightBehaviour)`
+- `AmbientColor` (Color) — fallback global si no hay `AmbientLight` activa (default `Color.Black`)
+- `Resolve(Vector2 worldPosition, LightingLayer layer)` → `Color` — color de iluminación acumulado en ese punto; apto para uso en CPU o como input de shader
+- `GetLightsInRange(Vector2 position, float radius, LightingLayer layer, List<LightBehaviour> results)` — sin alloc
+- `FillShaderParameters(Effect effect)` — setea arrays de posición/color/rango para un Effect GLSL/HLSL estándar (opcional; solo si el usuario usa rendering con shaders)
+- Registrado como **singleton** en el `IServiceCollection` del proyecto
+
+---
+
+### Milestone 9.x.6 — Integración con GameEntity / GameWorld
+
+- `LightBehaviour.Awake()` llama a `LightingWorld.Register(this)` automáticamente vía DI.
+- `LightBehaviour.OnDestroy()` (o equivalente en el ciclo de vida) llama a `Unregister(this)`.
+- `LightBehaviour` respeta `Active`: cuando el `GameEntity` se desactiva, `IsContributing` devuelve `false` y la luz deja de acumularse.
+- `GameWorld` expone `LightingWorld?` como propiedad si está registrado en DI — no obligatorio para proyectos que no usen iluminación dinámica.
+
+---
+
+### Tests esperados
+
+`UnitTests/Lighting/PointLight2DTests.cs`
+
+- `Resolve_WithPointLight_AtCenter_ReturnsFullIntensity`
+- `Resolve_WithPointLight_BeyondRange_ReturnsAmbientOnly`
+- `Resolve_WithMultipleLights_AccumulatesCorrectly`
+- `LightBehaviour_WhenEntityDeactivated_DoesNotContribute`
+- `LightingWorld_Register_Unregister_UpdatesLightCount`
+- `SpotLight2D_OutsideCone_ReturnsZeroContribution`
+
+---
+
+### Estructura de carpetas
+
+src/Alca.MonoGame.Kernel/
+├── Lighting/
+│   ├── AmbientLight.cs
+│   ├── DirectionalLight2D.cs
+│   ├── LightBehaviour.cs          (abstract)
+│   ├── LightContribution.cs       (struct)
+│   ├── LightingLayer.cs           (enum)
+│   ├── LightingWorld.cs           (sealed, singleton DI)
+│   ├── PointLight2D.cs
+│   └── SpotLight2D.cs
+
+---
+
+### Verificación
+
+Crear una `LightingWorld`, añadir un `PointLight2D` con `Range = 100` e `Intensity = 1` a una entidad en `(0, 0)`:
+- `Resolve((0, 0), LightingLayer.World)` → `Color.White`
+- `Resolve((100, 0), LightingLayer.World)` → `Color.Black` (en el límite exacto del rango)
+- Desactivar el `GameEntity` → `IsContributing == false` → `Resolve` devuelve `AmbientColor`
+
+## FASE 10+ — Por Definir
 
 Ideas para roadmaps futuros (sin especificación todavía):
-- **9.x — Animation System:** Sprite animation clips, Animation State Machine, blending
-- **9.x — Prefab System:** Serializable entity templates con JSON
-- **9.x — NavMesh 2D:** Navegación por waypoints o grid-based pathfinding (A*)
-- **9.x — Extended Audio:** Spatial audio, audio zones, mixer
-- **9.x — Networking:** P2P o cliente/servidor básico para juegos multijugador pequeños
+- **10.x — Animation System:** Sprite animation clips, Animation State Machine, blending
+- **10.x — Prefab System:** Serializable entity templates con JSON
+- **10.x — NavMesh 2D:** Navegación por waypoints o grid-based pathfinding (A*)
+- **10.x — Extended Audio:** Spatial audio, audio zones, mixer
+- **10.x — Networking:** P2P o cliente/servidor básico para juegos multijugador pequeños
 
 ---
 
