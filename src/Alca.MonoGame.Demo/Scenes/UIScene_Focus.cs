@@ -7,17 +7,15 @@ public sealed class UIScene_Focus : Scene
     private readonly UIInteractionManager _interactionManager = new();
     private readonly UIFocusManager _focusManager = new();
 
-    private Texture2D _pixel = null!;
     private SpriteFont _font = null!;
 
     private readonly Button[] _buttons = new Button[9];
     private Label _focusLabel = null!;
+    private Label _clickLabel = null!;
     private int _lastFocusedIdx = -1;
 
     public override void LoadContent()
     {
-        _pixel = new Texture2D(Core.GraphicsDevice, 1, 1);
-        _pixel.SetData(new[] { Color.White });
         _font = Content.Load<SpriteFont>("DefaultFont");
         BuildUI();
     }
@@ -31,6 +29,11 @@ public sealed class UIScene_Focus : Scene
         root.Add(backBtn);
         root.Add(new Label { Font = _font, Text = "Scene 10/10: Focus", Color = Color.DimGray });
         root.Add(new Label { Font = _font, Text = "Focus Demo  (Tab / arrows to navigate, Space/Enter to click)", Color = Color.Yellow, HAlign = HAlign.Center });
+
+        _focusLabel = new Label { Font = _font, Text = "Foco actual: —", Color = Color.LightGreen };
+        _clickLabel = new Label { Font = _font, Text = "Último click: —", Color = Color.Orange };
+        root.Add(_focusLabel);
+        root.Add(_clickLabel);
 
         // 3×3 grid of buttons
         var grid = new GridLayout();
@@ -57,7 +60,7 @@ public sealed class UIScene_Focus : Scene
                 int capturedIdx = idx;
                 btn.Clicked += () =>
                 {
-                    _focusLabel.Text = $"Foco actual: F{capturedIdx + 1}  (clicked)";
+                    _clickLabel.Text = $"Último click: F{capturedIdx + 1}";
                 };
                 _buttons[idx] = btn;
                 _focusManager.Register(btn);
@@ -67,9 +70,6 @@ public sealed class UIScene_Focus : Scene
         }
 
         root.Add(grid);
-
-        _focusLabel = new Label { Font = _font, Text = "Foco actual: —", Color = Color.LightGreen };
-        root.Add(_focusLabel);
 
         _uiRoot.Add(root);
         _focusManager.SetFocus(_buttons[0]);
@@ -99,7 +99,6 @@ public sealed class UIScene_Focus : Scene
 
     protected override void Dispose(bool disposing)
     {
-        if (disposing) _pixel?.Dispose();
         base.Dispose(disposing);
     }
 }

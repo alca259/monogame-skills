@@ -127,6 +127,11 @@ public sealed class UIFocusManager
                 FocusNext();
         }
 
+        if (kb.WasKeyJustPressed(Keys.Up))    FocusUp();
+        if (kb.WasKeyJustPressed(Keys.Down))  FocusDown();
+        if (kb.WasKeyJustPressed(Keys.Left))  FocusLeft();
+        if (kb.WasKeyJustPressed(Keys.Right)) FocusRight();
+
         if (pad.IsConnected)
         {
             if (pad.WasButtonJustPressed(Buttons.DPadUp))    FocusUp();
