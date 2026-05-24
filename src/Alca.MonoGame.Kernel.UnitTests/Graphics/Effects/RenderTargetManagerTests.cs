@@ -2,13 +2,6 @@ using Alca.MonoGame.Kernel.Graphics.Effects;
 
 namespace Alca.MonoGame.Kernel.UnitTests.Graphics.Effects;
 
-// RenderTargetManager requires a live GraphicsDevice and SpriteBatch (GPU dependency).
-// GPU tests must run in an integration test project with a headless MonoGame device.
-//
-// The tests here verify pure-logic behaviour that does not touch the GPU:
-// the IDisposable contract via reflection, and that the public API surface
-// matches the specification (constructor + BeginCapture/EndCapture/Apply/ApplyChain).
-
 public sealed class RenderTargetManagerApiSurfaceTests
 {
     [Fact]
@@ -31,5 +24,36 @@ public sealed class RenderTargetManagerApiSurfaceTests
         Assert.NotNull(t.GetMethod("Apply"));
         Assert.NotNull(t.GetMethod("ApplyChain"));
         Assert.NotNull(t.GetMethod("Dispose"));
+    }
+}
+
+[Collection(GraphicsCollection.Name)]
+public sealed class RenderTargetManagerGpuTests
+{
+    private readonly GraphicsDeviceFixture _fx;
+
+    public RenderTargetManagerGpuTests(GraphicsDeviceFixture fx) => _fx = fx;
+
+    [Fact]
+    public void Constructor_WithValidDimensions_DoesNotThrow()
+    {
+        using var rtm = new RenderTargetManager(_fx.GraphicsDevice, 64, 64);
+        Assert.NotNull(rtm);
+    }
+
+    [Fact]
+    public void BeginCapture_ThenEndCapture_DoesNotThrow()
+    {
+        using var rtm = new RenderTargetManager(_fx.GraphicsDevice, 64, 64);
+        rtm.BeginCapture();
+        rtm.EndCapture();
+    }
+
+    [Fact]
+    public void Dispose_CalledMultipleTimes_DoesNotThrow()
+    {
+        var rtm = new RenderTargetManager(_fx.GraphicsDevice, 64, 64);
+        rtm.Dispose();
+        rtm.Dispose();
     }
 }

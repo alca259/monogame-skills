@@ -464,3 +464,38 @@ src/
   - Ejemplo: `ECS/TransformBehaviour.cs` → `Tests/ECS/TransformBehaviourTests.cs`
 - Patrón de nombre de test: `Método_Escenario_ResultadoEsperado`
 - Aserciones: `Assert.*` de xUnit; `Assert.Equal(expected, actual, precision)` para floats
+
+### Tests con GraphicsDevice (GPU)
+
+`GraphicsDevice` requiere un contexto SDL2+OpenGL real. **No usar WinForms** — el proyecto usa `MonoGame.Framework.DesktopGL` (SDL2/OpenGL), no DirectX; los handles de WinForms no son compatibles.
+
+**Infraestructura disponible en `UnitTests/Fixtures/`:**
+
+| Clase | Rol |
+|-------|-----|
+| `GraphicsDeviceFixture` | Crea un `Game` headless (ventana 1×1) que sale tras un frame; expone `GraphicsDevice` y `SpriteBatch` vivos hasta `Dispose()` |
+| `GraphicsCollectionDefinition` | `[CollectionDefinition]` de xUnit — una sola instancia del fixture por colección |
+| `GraphicsCollection.Name` | Constante `"GraphicsDevice"` |
+
+**Patrón de uso:**
+
+```csharp
+[Collection(GraphicsCollection.Name)]
+public sealed class MiClaseGpuTests
+{
+    private readonly GraphicsDeviceFixture _fx;
+
+    public MiClaseGpuTests(GraphicsDeviceFixture fx) => _fx = fx;
+
+    [Fact]
+    public void Constructor_ConArgumentosValidos_NoLanzaExcepcion()
+    {
+        using var sut = new MiClase(_fx.GraphicsDevice);
+        Assert.NotNull(sut);
+    }
+}
+```
+
+- Todos los tests que compartan `[Collection(GraphicsCollection.Name)]` reutilizan **la misma instancia** del fixture (barato en tiempo de setup).
+- Tests sin GPU siguen siendo clases normales (sin `[Collection]`).
+- `_fx.SpriteBatch` está disponible para clases que lo necesiten como argumento.
