@@ -23,9 +23,9 @@ public sealed class EditorEventBusTests
         Action<AssetImportedEvent> handler = _ => callCount++;
 
         bus.Subscribe(handler);
-        bus.Publish(new AssetImportedEvent("test.png"));
+        bus.Publish(new AssetImportedEvent(new AssetInfo("/c/test.png", "test.png", "test", AssetType.Texture, ".png", 0)));
         bus.Unsubscribe(handler);
-        bus.Publish(new AssetImportedEvent("test2.png"));
+        bus.Publish(new AssetImportedEvent(new AssetInfo("/c/test2.png", "test2.png", "test2", AssetType.Texture, ".png", 0)));
 
         Assert.Equal(1, callCount);
     }

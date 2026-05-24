@@ -1,5 +1,6 @@
 global using System.Text.Json;
 global using System.Text.Json.Serialization;
+global using MonoGame.Editor.Core.Assets;
 global using MonoGame.Editor.Core.Attributes;
 global using MonoGame.Editor.Core.Commands;
 global using MonoGame.Editor.Core.Events;

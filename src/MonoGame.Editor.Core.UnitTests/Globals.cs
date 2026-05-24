@@ -1,4 +1,5 @@
 global using MonoGame.Editor.Core;
+global using MonoGame.Editor.Core.Assets;
 global using MonoGame.Editor.Core.Attributes;
 global using MonoGame.Editor.Core.Commands;
 global using MonoGame.Editor.Core.Events;

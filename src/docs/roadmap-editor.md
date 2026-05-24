@@ -63,7 +63,7 @@ MonoGame.Editor.sln
 
 ---
 
-## Fase 0 — Fundamentos y contratos base
+## Fase 0 — Fundamentos y contratos base ✅ COMPLETADA
 
 ### Objetivo
 Infraestructura transversal del editor: estado global, bus de eventos, preferencias persistidas.  
@@ -157,7 +157,7 @@ Eventos tipados adicionales:
 
 ---
 
-## Fase 1 — WinForms shell con viewport MonoGame embebido
+## Fase 1 — WinForms shell con viewport MonoGame embebido ✅ COMPLETADA
 
 ### Objetivo
 Ventana del editor funcional con viewport MonoGame, controles Play/Pause/Stop y layout de paneles.
@@ -217,7 +217,7 @@ sealed class MonoGameControl : Control
 
 ---
 
-## Fase 2 — Sistema Undo/Redo
+## Fase 2 — Sistema Undo/Redo ✅ COMPLETADA
 
 ### Objetivo
 Historial de operaciones reversibles. Esencial para cualquier flujo de edición profesional.
@@ -275,7 +275,7 @@ sealed class CommandStack
 
 ---
 
-## Fase 3 — Jerarquía de escena e Inspector
+## Fase 3 — Jerarquía de escena e Inspector ✅ COMPLETADA
 
 ### Objetivo
 Árbol de game objects enlazado directamente al `GameWorld` del Kernel. Inspector de propiedades por reflexión sobre `GameBehaviour`.
@@ -382,7 +382,7 @@ EditorBehaviour
 
 ---
 
-## Fase 4 — Gizmos de transform y grid/snap
+## Fase 4 — Gizmos de transform y grid/snap ✅ COMPLETADA
 
 ### Objetivo
 Herramientas visuales de transformación en el viewport: move, rotate, scale. Grid configurable con snap.
@@ -436,7 +436,7 @@ Modo activo seleccionable en toolbar (y por atajo de teclado):
 
 ---
 
-## Fase 5 — Asset Browser e integración Content Pipeline
+## Fase 5 — Asset Browser e integración Content Pipeline ✅ COMPLETADA
 
 ### Objetivo
 Browser de assets con drag & drop al viewport y al Inspector. Importación y recompilación automática.

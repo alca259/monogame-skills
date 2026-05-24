@@ -8,6 +8,7 @@ public sealed partial class EditorForm : Form
     private readonly GameObjectRegistry _registry = null!;
     private readonly GizmoController _gizmoCtrl = new();
     private GizmoRenderer? _gizmoRenderer;
+    private readonly ContentWatcher _contentWatcher = null!;
 
     /// <summary>Designer-only constructor.</summary>
     public EditorForm() => InitializeComponent();
@@ -18,6 +19,7 @@ public sealed partial class EditorForm : Form
         _registry  = new GameObjectRegistry();
         _preferences = new EditorPreferences();
         _preferences.Load();
+        _contentWatcher = new ContentWatcher(context.EventBus);
 
         InitializeComponent();
         WireEvents();
@@ -86,6 +88,10 @@ public sealed partial class EditorForm : Form
         // Initialize panels
         _hierarchyPanel.Initialize(_context);
         _inspectorPanel.Initialize(_context, _registry);
+        _assetBrowserPanel.Initialize(_context);
+
+        // Build Project menu programmatically (avoids Designer.cs C#-version concerns)
+        BuildProjectMenu();
     }
 
     private void SavePreferences()
@@ -107,6 +113,7 @@ public sealed partial class EditorForm : Form
         _context.EventBus.Unsubscribe<UndoPerformedEvent>(OnUndoPerformed);
         _context.EventBus.Unsubscribe<RedoPerformedEvent>(OnRedoPerformed);
         _context.EventBus.Unsubscribe<ProjectOpenedEvent>(OnProjectOpened);
+        _contentWatcher.Dispose();
         _gizmoRenderer?.Dispose();
         base.OnFormClosed(e);
     }
@@ -144,7 +151,7 @@ public sealed partial class EditorForm : Form
 
     #region Toolbar — Play / Pause / Stop
 
-    private void OnPlayClick(object? sender, EventArgs e)
+    private async void OnPlayClick(object? sender, EventArgs e)
     {
         EditorState next = _context.State switch
         {
@@ -152,7 +159,47 @@ public sealed partial class EditorForm : Form
             EditorState.Paused  => EditorState.Playing,
             _                   => EditorState.Playing,
         };
+
+        if (next == EditorState.Playing && _context.State == EditorState.Editing)
+            await BuildContentIfNeededAsync().ConfigureAwait(true);
+
         _context.SetState(next);
+    }
+
+    private async Task BuildContentIfNeededAsync()
+    {
+        EditorProject? project = _context.ActiveProject;
+        if (project is null) return;
+
+        string mgcbFile = Path.Combine(project.ContentPath, "Content.mgcb");
+        if (!File.Exists(mgcbFile)) return;
+
+        _consolePanel.AppendLine("[Play] Building content before play…");
+        _statusLabel.Text = "Building content…";
+
+        try
+        {
+            int exitCode = await MgcbRunner.RunAsync(mgcbFile,
+                line => _consolePanel.AppendLine(line)).ConfigureAwait(false);
+
+            if (exitCode != 0)
+            {
+                _consolePanel.AppendLine($"[Play] Content build failed (exit {exitCode}). Aborting play.");
+                _statusLabel.Text = "Build failed.";
+                throw new InvalidOperationException($"Content build failed with exit code {exitCode}.");
+            }
+
+            _statusLabel.Text = "Build succeeded.";
+        }
+        catch (InvalidOperationException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _consolePanel.AppendLine($"[Play] Build error: {ex.Message}");
+            _statusLabel.Text = "Build error.";
+        }
     }
 
     private void OnPauseClick(object? sender, EventArgs e)
@@ -301,6 +348,57 @@ public sealed partial class EditorForm : Form
 
     #endregion
 
+    #region Menu — Project
+
+    private void BuildProjectMenu()
+    {
+        ToolStripMenuItem buildContentItem = new()
+        {
+            Text             = "Build Content",
+            ShortcutKeys     = Keys.F7,
+            ShowShortcutKeys = true,
+        };
+        buildContentItem.Click += OnBuildContentClick;
+        _projectMenu.DropDownItems.Add(buildContentItem);
+    }
+
+    private async void OnBuildContentClick(object? sender, EventArgs e)
+    {
+        EditorProject? project = _context.ActiveProject;
+        if (project is null)
+        {
+            _consolePanel.AppendLine("[Build] No project is open.");
+            return;
+        }
+
+        string mgcbFile = Path.Combine(project.ContentPath, "Content.mgcb");
+        if (!File.Exists(mgcbFile))
+        {
+            _consolePanel.AppendLine($"[Build] Content.mgcb not found at: {mgcbFile}");
+            return;
+        }
+
+        _consolePanel.AppendLine("[Build] Starting content build…");
+        _statusLabel.Text = "Building content…";
+
+        try
+        {
+            int exitCode = await MgcbRunner.RunAsync(mgcbFile,
+                line => _consolePanel.AppendLine(line)).ConfigureAwait(true);
+
+            string result = exitCode == 0 ? "Build succeeded." : $"Build failed (exit {exitCode}).";
+            _consolePanel.AppendLine($"[Build] {result}");
+            _statusLabel.Text = result;
+        }
+        catch (Exception ex)
+        {
+            _consolePanel.AppendLine($"[Build] Error: {ex.Message}");
+            _statusLabel.Text = "Build error.";
+        }
+    }
+
+    #endregion
+
     #region Menu — File
 
     private async void OnFileNewProjectClick(object? sender, EventArgs e)
@@ -381,6 +479,9 @@ public sealed partial class EditorForm : Form
     {
         if (InvokeRequired) { BeginInvoke(() => OnProjectOpened(evt)); return; }
         Text = evt.Project is null ? "MonoGame Editor" : $"MonoGame Editor — {evt.Project.Name}";
+
+        string contentPath = evt.Project?.ContentPath ?? string.Empty;
+        _contentWatcher.Watch(contentPath);
     }
 
     #endregion
