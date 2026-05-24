@@ -163,6 +163,5 @@ public sealed class SceneManager
     private static void SetupAndStartScene(Scene scene)
     {
         scene.Initialize();
-        scene.LoadContent();
     }
 }
