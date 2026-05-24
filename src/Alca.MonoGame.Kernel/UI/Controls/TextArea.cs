@@ -7,6 +7,8 @@ public sealed class TextArea : TextBoxBase
 {
     #region Fields
 
+    private const int ScrollBarWidth = 8;
+
     private readonly List<string> _lines = new(8);
     private int _scrollOffsetLines;
     private bool _linesDirty = true;
@@ -73,6 +75,17 @@ public sealed class TextArea : TextBoxBase
         {
             _cachedCursorLinePrefix = string.Empty;
         }
+
+        ScrollToCursor(line);
+    }
+
+    private void ScrollToCursor(int cursorLine)
+    {
+        int visible = VisibleLineCount();
+        if (cursorLine < _scrollOffsetLines)
+            _scrollOffsetLines = cursorLine;
+        else if (cursorLine >= _scrollOffsetLines + visible)
+            _scrollOffsetLines = cursorLine - visible + 1;
     }
 
     /// <inheritdoc/>
@@ -112,7 +125,7 @@ public sealed class TextArea : TextBoxBase
         if (!_linesDirty) return;
 
         _lines.Clear();
-        int wrapWidth = (WordWrap && Bounds.Width > 8) ? Bounds.Width - 8 : int.MaxValue;
+        int wrapWidth = (WordWrap && Bounds.Width > 8) ? Bounds.Width - 8 - ScrollBarWidth : int.MaxValue;
 
         int start = 0;
         for (int i = 0; i <= _text.Length; i++)
@@ -292,6 +305,28 @@ public sealed class TextArea : TextBoxBase
                     TextColor * opacity);
             }
         }
+
+        if (_lines.Count > visibleCount)
+            DrawScrollBar(spriteBatch, opacity, _lines.Count, visibleCount);
+    }
+
+    private void DrawScrollBar(SpriteBatch spriteBatch, float opacity, int totalLines, int visibleLines)
+    {
+        int trackX = Bounds.Right - ScrollBarWidth - 1;
+        int trackY = Bounds.Y + 2;
+        int trackH = Bounds.Height - 4;
+
+        spriteBatch.Draw(_pixel!, new Rectangle(trackX, trackY, ScrollBarWidth, trackH),
+            new Color(50, 50, 50) * opacity);
+
+        float thumbRatio = Math.Min(1f, (float)visibleLines / totalLines);
+        int thumbH = Math.Max(10, (int)(trackH * thumbRatio));
+        int maxScroll = totalLines - visibleLines;
+        float scrollRatio = maxScroll > 0 ? (float)_scrollOffsetLines / maxScroll : 0f;
+        int thumbY = trackY + (int)((trackH - thumbH) * scrollRatio);
+
+        spriteBatch.Draw(_pixel!, new Rectangle(trackX + 1, thumbY, ScrollBarWidth - 2, thumbH),
+            BorderColor * opacity);
     }
 
     #endregion

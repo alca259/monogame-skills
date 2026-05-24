@@ -50,6 +50,8 @@ public abstract class Core : Game
     public static UIFocusManager UIFocus { get; private set; } = null!;
     /// <summary>Gets the UI overlay manager for floating elements such as dropdowns and tooltips.</summary>
     public static UIOverlayManager UIOverlay { get; private set; } = null!;
+    /// <summary>Gets the game window (for TextInput event subscription and window title changes).</summary>
+    public static new GameWindow Window { get; private set; } = null!;
     /// <summary>Gets or sets a value that indicates if the game should exit when the Escape key is pressed.</summary>
     public static bool ExitOnEscape { get; set; }
 
@@ -77,6 +79,7 @@ public abstract class Core : Game
 
         Graphics.ApplyChanges();
 
+        Window = base.Window;
         Window.Title = title;
         Content = base.Content;
         Content.RootDirectory = "Content";

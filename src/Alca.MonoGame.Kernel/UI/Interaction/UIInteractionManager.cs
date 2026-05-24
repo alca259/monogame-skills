@@ -1,4 +1,5 @@
 using Alca.MonoGame.Kernel.Input;
+using Alca.MonoGame.Kernel.UI.Focus;
 
 namespace Alca.MonoGame.Kernel.UI.Interaction;
 
@@ -15,7 +16,8 @@ public sealed class UIInteractionManager
     /// Must be called after the layout Arrange pass so Bounds are current.</summary>
     /// <param name="root">Root of the UI tree to test against.</param>
     /// <param name="mouse">Current-frame mouse snapshot from InputManager.</param>
-    public void Update(UIRoot root, MouseInfo mouse)
+    /// <param name="focusManager">Optional focus manager; when provided, clicking an <see cref="IFocusable"/> element transfers focus to it.</param>
+    public void Update(UIRoot root, MouseInfo mouse, UIFocusManager? focusManager = null)
     {
         Point mousePos = mouse.Position;
 
@@ -37,6 +39,18 @@ public sealed class UIInteractionManager
 
         if (justPressed && newHover is not null)
         {
+            if (focusManager is not null)
+            {
+                UIElement? cur = newHover;
+                IFocusable? focusTarget = null;
+                while (cur is not null)
+                {
+                    if (cur is IFocusable f) { focusTarget = f; break; }
+                    cur = cur.Parent;
+                }
+                focusManager.SetFocus(focusTarget);
+            }
+
             _eventArgs = new UIPointerEventArgs { Position = mousePos, Button = MouseButton.Left };
             BubblePointerDown(newHover, ref _eventArgs);
         }

@@ -33,7 +33,7 @@ public sealed class UIScene_TextArea : Scene
         root.Add(new Label { Font = _font, Text = "Scene 3/10: TextArea", Color = Color.DimGray });
         root.Add(new Label { Font = _font, Text = "TextArea Demo — escribe texto largo", Color = Color.Yellow, HAlign = HAlign.Center });
 
-        _textArea = new TextArea(_font, _pixel, null)
+        _textArea = new TextArea(_font, _pixel, Core.Window)
         {
             WordWrap = true,
             MaxLength = MaxChars,
@@ -65,7 +65,7 @@ public sealed class UIScene_TextArea : Scene
         Rectangle screen = new(0, 0, Core.GraphicsDevice.Viewport.Width, Core.GraphicsDevice.Viewport.Height);
         _uiRoot.Measure(new Vector2(screen.Width, screen.Height));
         _uiRoot.Arrange(screen);
-        _interactionManager.Update(_uiRoot, Core.Input.Mouse);
+        _interactionManager.Update(_uiRoot, Core.Input.Mouse, _focusManager);
         _focusManager.Update(Core.Input.Keyboard, Core.Input.GamePads[0]);
     }
 

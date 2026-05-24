@@ -45,7 +45,7 @@ public sealed class UIScene_InputText : Scene
         grid.Add(lbl0);
         grid.SetCell(lbl0, 0, 0);
 
-        _textBox = new TextBox(_font, _pixel, null) { Placeholder = "Escribe aquí...", TabIndex = 0 };
+        _textBox = new TextBox(_font, _pixel, Core.Window) { Placeholder = "Escribe aquí...", TabIndex = 0 };
         _textBox.TextChanged += _ => UpdateValues();
         _focusManager.Register(_textBox);
         grid.Add(_textBox);
@@ -55,7 +55,7 @@ public sealed class UIScene_InputText : Scene
         grid.Add(lbl1);
         grid.SetCell(lbl1, 1, 0);
 
-        _numericBox = new NumericBox(_font, _pixel, null) { MinValue = 0, MaxValue = 100, Step = 1, IsInt = true, TabIndex = 1 };
+        _numericBox = new NumericBox(_font, _pixel, Core.Window) { MinValue = 0, MaxValue = 100, Step = 1, IsInt = true, TabIndex = 1 };
         _numericBox.SetText("50");
         _numericBox.TextChanged += _ => UpdateValues();
         _focusManager.Register(_numericBox);
@@ -66,7 +66,7 @@ public sealed class UIScene_InputText : Scene
         grid.Add(lbl2);
         grid.SetCell(lbl2, 2, 0);
 
-        _passwordBox = new PasswordBox(_font, _pixel, null) { Placeholder = "Contraseña", TabIndex = 2 };
+        _passwordBox = new PasswordBox(_font, _pixel, Core.Window) { Placeholder = "Contraseña", TabIndex = 2 };
         _passwordBox.TextChanged += _ => UpdateValues();
         _focusManager.Register(_passwordBox);
         grid.Add(_passwordBox);
@@ -91,7 +91,7 @@ public sealed class UIScene_InputText : Scene
         Rectangle screen = new(0, 0, Core.GraphicsDevice.Viewport.Width, Core.GraphicsDevice.Viewport.Height);
         _uiRoot.Measure(new Vector2(screen.Width, screen.Height));
         _uiRoot.Arrange(screen);
-        _interactionManager.Update(_uiRoot, Core.Input.Mouse);
+        _interactionManager.Update(_uiRoot, Core.Input.Mouse, _focusManager);
         _focusManager.Update(Core.Input.Keyboard, Core.Input.GamePads[0]);
     }
 

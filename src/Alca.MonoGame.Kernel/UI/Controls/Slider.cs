@@ -191,8 +191,15 @@ public sealed class Slider : UIElement, IUIInteractable, IFocusable
         if (_isDragging)
         {
             MouseState ms = Mouse.GetState();
-            SetValueFromPosition(ms.X, ms.Y);
-            UpdateThumbRects();
+            if (ms.LeftButton == ButtonState.Released)
+            {
+                _isDragging = false;
+            }
+            else
+            {
+                SetValueFromPosition(ms.X, ms.Y);
+                UpdateThumbRects();
+            }
         }
 
         if (_isFocused)

@@ -69,7 +69,7 @@ public sealed class UIScene_Tooltip : Scene
         Rectangle screen = new(0, 0, Core.GraphicsDevice.Viewport.Width, Core.GraphicsDevice.Viewport.Height);
         _uiRoot.Measure(new Vector2(screen.Width, screen.Height));
         _uiRoot.Arrange(screen);
-        _interactionManager.Update(_uiRoot, Core.Input.Mouse);
+        _interactionManager.Update(_uiRoot, Core.Input.Mouse, _focusManager);
         _focusManager.Update(Core.Input.Keyboard, Core.Input.GamePads[0]);
 
         UpdateTooltip();

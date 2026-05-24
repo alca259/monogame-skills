@@ -43,9 +43,32 @@ public sealed class NumericBox : TextBoxBase
     /// <inheritdoc/>
     protected override bool AcceptChar(char c)
     {
-        if (char.IsDigit(c)) return true;
-        if (c == '-' && _cursorIndex == 0 && !Text.Contains('-')) return true;
-        if (!IsInt && (c == '.' || c == ',') && !Text.Contains('.') && !Text.Contains(',')) return true;
+        if (char.IsDigit(c))
+        {
+            var (selMin, selMax) = HasSelection ? GetSelectionRange() : (_cursorIndex, _cursorIndex);
+            string candidate = _text.ToString(0, selMin) + c + _text.ToString(selMax, _text.Length - selMax);
+
+            if (IsInt)
+            {
+                if (!long.TryParse(candidate, NumberStyles.Integer, CultureInfo.InvariantCulture, out long val))
+                    return false;
+                double effMin = Math.Max((double)MinValue, int.MinValue);
+                double effMax = Math.Min((double)MaxValue, int.MaxValue);
+                return val >= effMin && val <= effMax;
+            }
+
+            // For float: allow intermediate states (e.g. "3." or "-"); reject only when parsed value is out of range.
+            if (double.TryParse(candidate, NumberStyles.Float, CultureInfo.InvariantCulture, out double fVal))
+                return fVal >= (double)MinValue && fVal <= (double)MaxValue;
+            return true;
+        }
+
+        if (c == '-' && _cursorIndex == 0 && !Text.Contains('-'))
+            return MinValue < 0;
+
+        if (!IsInt && (c == '.' || c == ',') && !Text.Contains('.') && !Text.Contains(','))
+            return true;
+
         return false;
     }
 
