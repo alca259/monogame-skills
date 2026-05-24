@@ -30,4 +30,10 @@ public sealed class EditorGameObject
     /// <summary>Parent object, or <c>null</c> if this is a root object. Excluded from serialization to avoid circular references.</summary>
     [JsonIgnore]
     public EditorGameObject? Parent { get; set; }
+
+    /// <summary>
+    /// Path to the source <c>.prefab.json</c> file when this object was instantiated from a prefab,
+    /// or <c>null</c> if this is a plain game object.
+    /// </summary>
+    public string? PrefabPath { get; set; }
 }

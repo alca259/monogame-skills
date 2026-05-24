@@ -509,7 +509,7 @@ Al seleccionar un game object con tilemap, el viewport entra en modo tilemap:
 
 ---
 
-## Fase 7 — Sistema de Prefabs
+## Fase 7 — Sistema de Prefabs ✅ COMPLETADA
 
 ### Objetivo
 Guardar y reutilizar configuraciones de game objects como plantillas reutilizables, al estilo Unity.

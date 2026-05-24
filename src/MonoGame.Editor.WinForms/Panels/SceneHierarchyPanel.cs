@@ -10,6 +10,7 @@ public sealed class SceneHierarchyPanel : UserControl
     #region Fields
 
     private EditorContext? _context;
+    private PrefabManager? _prefabManager;
     private bool _suppressSelectionEvent;
     private bool _suppressCheckEvent;
     private readonly List<EditorGameObject> _multiSelected = [];
@@ -22,6 +23,9 @@ public sealed class SceneHierarchyPanel : UserControl
     private readonly ToolStripMenuItem _renameItem;
     private readonly ToolStripMenuItem _deleteItem;
     private readonly ToolStripMenuItem _setActiveItem;
+    private readonly ToolStripMenuItem _saveAsPrefabItem;
+    private readonly ToolStripMenuItem _applyPrefabItem;
+    private readonly ToolStripMenuItem _revertPrefabItem;
 
     private Action<UndoPerformedEvent>? _onUndo;
     private Action<RedoPerformedEvent>? _onRedo;
@@ -33,12 +37,15 @@ public sealed class SceneHierarchyPanel : UserControl
     /// <summary>Creates the panel with a TreeView and context menu. Call <see cref="Initialize"/> to connect to the editor context.</summary>
     public SceneHierarchyPanel()
     {
-        _createEmptyItem = new ToolStripMenuItem("Create Empty");
-        _createChildItem = new ToolStripMenuItem("Create Child");
-        _duplicateItem   = new ToolStripMenuItem("Duplicate\tCtrl+D");
-        _renameItem      = new ToolStripMenuItem("Rename\tF2");
-        _deleteItem      = new ToolStripMenuItem("Delete\tDel");
-        _setActiveItem   = new ToolStripMenuItem("Toggle Active");
+        _createEmptyItem  = new ToolStripMenuItem("Create Empty");
+        _createChildItem  = new ToolStripMenuItem("Create Child");
+        _duplicateItem    = new ToolStripMenuItem("Duplicate\tCtrl+D");
+        _renameItem       = new ToolStripMenuItem("Rename\tF2");
+        _deleteItem       = new ToolStripMenuItem("Delete\tDel");
+        _setActiveItem    = new ToolStripMenuItem("Toggle Active");
+        _saveAsPrefabItem = new ToolStripMenuItem("Save as Prefab...");
+        _applyPrefabItem  = new ToolStripMenuItem("Apply Prefab");
+        _revertPrefabItem = new ToolStripMenuItem("Revert from Prefab");
 
         _contextMenu = new ContextMenuStrip();
         _contextMenu.Items.AddRange(new ToolStripItem[]
@@ -52,6 +59,10 @@ public sealed class SceneHierarchyPanel : UserControl
             _deleteItem,
             new ToolStripSeparator(),
             _setActiveItem,
+            new ToolStripSeparator(),
+            _saveAsPrefabItem,
+            _applyPrefabItem,
+            _revertPrefabItem,
         });
 
         _tree = new TreeView
@@ -76,9 +87,10 @@ public sealed class SceneHierarchyPanel : UserControl
     #region Initialization
 
     /// <summary>Connects this panel to the editor context. Must be called before any scene is loaded.</summary>
-    public void Initialize(EditorContext context)
+    public void Initialize(EditorContext context, PrefabManager? prefabManager = null)
     {
-        _context = context;
+        _context      = context;
+        _prefabManager = prefabManager;
 
         _onUndo = _ => RefreshTreeSafe();
         _onRedo = _ => RefreshTreeSafe();
@@ -154,6 +166,8 @@ public sealed class SceneHierarchyPanel : UserControl
     private static TreeNode BuildNode(EditorGameObject obj)
     {
         TreeNode node = new TreeNode(obj.Name) { Tag = obj, Checked = obj.Active };
+        if (obj.PrefabPath is not null)
+            node.ForeColor = System.Drawing.Color.CornflowerBlue;
         for (int i = 0; i < obj.Children.Count; i++)
             node.Nodes.Add(BuildNode(obj.Children[i]));
         return node;
@@ -185,20 +199,23 @@ public sealed class SceneHierarchyPanel : UserControl
         _tree.AfterLabelEdit += OnAfterLabelEdit;
         _tree.KeyDown        += OnTreeKeyDown;
         _tree.ItemDrag       += OnItemDrag;
-        _tree.DragEnter      += (_, e) => e.Effect = DragDropEffects.Move;
+        _tree.DragEnter      += OnTreeDragEnter;
         _tree.DragOver       += OnDragOver;
         _tree.DragDrop       += OnDragDrop;
     }
 
     private void WireMenuEvents()
     {
-        _createEmptyItem.Click += OnCreateEmpty;
-        _createChildItem.Click += OnCreateChild;
-        _duplicateItem.Click   += OnDuplicate;
-        _renameItem.Click      += (_, _) => _tree.SelectedNode?.BeginEdit();
-        _deleteItem.Click      += OnDelete;
-        _setActiveItem.Click   += OnToggleActive;
-        _contextMenu.Opening   += OnContextMenuOpening;
+        _createEmptyItem.Click  += OnCreateEmpty;
+        _createChildItem.Click  += OnCreateChild;
+        _duplicateItem.Click    += OnDuplicate;
+        _renameItem.Click       += (_, _) => _tree.SelectedNode?.BeginEdit();
+        _deleteItem.Click       += OnDelete;
+        _setActiveItem.Click    += OnToggleActive;
+        _saveAsPrefabItem.Click += OnSaveAsPrefab;
+        _applyPrefabItem.Click  += OnApplyPrefab;
+        _revertPrefabItem.Click += OnRevertFromPrefab;
+        _contextMenu.Opening    += OnContextMenuOpening;
     }
 
     #endregion
@@ -303,12 +320,17 @@ public sealed class SceneHierarchyPanel : UserControl
     {
         bool hasScene    = _context?.ActiveScene is not null;
         bool hasSelected = _tree.SelectedNode?.Tag is EditorGameObject;
-        _createEmptyItem.Enabled = hasScene;
-        _createChildItem.Enabled = hasSelected;
-        _duplicateItem.Enabled   = hasSelected;
-        _renameItem.Enabled      = hasSelected;
-        _deleteItem.Enabled      = hasSelected;
-        _setActiveItem.Enabled   = hasSelected;
+        bool isPrefab    = _tree.SelectedNode?.Tag is EditorGameObject { PrefabPath: not null };
+        bool hasPrefabMgr = _prefabManager is not null;
+        _createEmptyItem.Enabled  = hasScene;
+        _createChildItem.Enabled  = hasSelected;
+        _duplicateItem.Enabled    = hasSelected;
+        _renameItem.Enabled       = hasSelected;
+        _deleteItem.Enabled       = hasSelected;
+        _setActiveItem.Enabled    = hasSelected;
+        _saveAsPrefabItem.Enabled = hasSelected && hasPrefabMgr;
+        _applyPrefabItem.Enabled  = isPrefab && hasPrefabMgr;
+        _revertPrefabItem.Enabled = isPrefab && hasPrefabMgr;
     }
 
     private void OnCreateEmpty(object? sender, EventArgs e)
@@ -364,6 +386,47 @@ public sealed class SceneHierarchyPanel : UserControl
         finally { _suppressCheckEvent = false; }
     }
 
+    private void OnSaveAsPrefab(object? sender, EventArgs e)
+    {
+        EditorScene? scene = _context?.ActiveScene;
+        if (scene is null || _prefabManager is null) return;
+        if (_tree.SelectedNode?.Tag is not EditorGameObject source) return;
+
+        EditorProject? project = _context!.ActiveProject;
+        string prefabsDir = project is not null
+            ? project.PrefabsPath
+            : Path.Combine(AppContext.BaseDirectory, "Prefabs");
+
+        using SaveFileDialog dlg = new SaveFileDialog
+        {
+            Title            = "Save as Prefab",
+            Filter           = "Prefab files (*.prefab.json)|*.prefab.json",
+            DefaultExt       = "prefab.json",
+            FileName         = source.Name,
+            InitialDirectory = prefabsDir,
+        };
+
+        if (dlg.ShowDialog(this) != DialogResult.OK) return;
+        _prefabManager.Save(source, dlg.FileName);
+        source.PrefabPath = dlg.FileName;
+        RefreshTreeSafe();
+    }
+
+    private void OnApplyPrefab(object? sender, EventArgs e)
+    {
+        if (_prefabManager is null) return;
+        if (_tree.SelectedNode?.Tag is not EditorGameObject { PrefabPath: { } prefabPath } obj) return;
+        _context!.Commands.Execute(new ApplyPrefabCommand(obj, prefabPath, _prefabManager));
+    }
+
+    private void OnRevertFromPrefab(object? sender, EventArgs e)
+    {
+        if (_prefabManager is null) return;
+        if (_tree.SelectedNode?.Tag is not EditorGameObject { PrefabPath: { } prefabPath } obj) return;
+        _context!.Commands.Execute(new RevertPrefabCommand(obj, prefabPath, _prefabManager));
+        RefreshTreeSafe();
+    }
+
     #endregion
 
     #region Drag and drop
@@ -374,15 +437,49 @@ public sealed class SceneHierarchyPanel : UserControl
             DoDragDrop(node, DragDropEffects.Move);
     }
 
+    private void OnTreeDragEnter(object? sender, DragEventArgs e)
+    {
+        // Accept tree node reparenting or prefab file drops from asset browser
+        if (e.Data?.GetDataPresent(typeof(TreeNode)) == true)
+        {
+            e.Effect = DragDropEffects.Move;
+            return;
+        }
+        if (e.Data?.GetDataPresent(DataFormats.Text) == true)
+        {
+            string? path = e.Data.GetData(DataFormats.Text) as string;
+            e.Effect = IsPrefabFile(path) ? DragDropEffects.Copy : DragDropEffects.None;
+            return;
+        }
+        e.Effect = DragDropEffects.None;
+    }
+
     private void OnDragOver(object? sender, DragEventArgs e)
     {
         TreeNode? target = _tree.GetNodeAt(_tree.PointToClient(new System.Drawing.Point(e.X, e.Y)));
         if (target is not null) _tree.SelectedNode = target;
-        e.Effect = DragDropEffects.Move;
+
+        if (e.Data?.GetDataPresent(typeof(TreeNode)) == true)
+            e.Effect = DragDropEffects.Move;
+        else if (e.Data?.GetDataPresent(DataFormats.Text) == true)
+        {
+            string? path = e.Data.GetData(DataFormats.Text) as string;
+            e.Effect = IsPrefabFile(path) ? DragDropEffects.Copy : DragDropEffects.None;
+        }
+        else
+            e.Effect = DragDropEffects.None;
     }
 
     private void OnDragDrop(object? sender, DragEventArgs e)
     {
+        // ── Prefab file drop ─────────────────────────────────────────────
+        if (e.Data?.GetData(DataFormats.Text) is string filePath && IsPrefabFile(filePath))
+        {
+            InstantiatePrefabAtDrop(filePath);
+            return;
+        }
+
+        // ── Tree node reparenting ────────────────────────────────────────
         if (e.Data?.GetData(typeof(TreeNode)) is not TreeNode draggedNode) return;
         if (draggedNode.Tag is not EditorGameObject draggedObj) return;
 
@@ -404,6 +501,23 @@ public sealed class SceneHierarchyPanel : UserControl
         _context!.Commands.Execute(new ReparentEntityCommand(draggedObj, scene, newParent));
         RefreshTreeSafe();
     }
+
+    private void InstantiatePrefabAtDrop(string prefabPath)
+    {
+        if (_prefabManager is null || _context?.ActiveScene is null) return;
+        EditorGameObject? instance = _prefabManager.Instantiate(prefabPath);
+        if (instance is null) return;
+
+        System.Drawing.Point pt = _tree.PointToClient(System.Windows.Forms.Cursor.Position);
+        TreeNode? targetNode = _tree.GetNodeAt(pt);
+        EditorGameObject? parent = targetNode?.Tag as EditorGameObject;
+
+        _context.Commands.Execute(new CreateEntityCommand(instance, _context.ActiveScene, parent));
+        RefreshTreeSafe();
+    }
+
+    private static bool IsPrefabFile(string? path)
+        => path is not null && path.EndsWith(".prefab.json", StringComparison.OrdinalIgnoreCase);
 
     private static bool IsAncestorOf(TreeNode ancestor, TreeNode node)
     {

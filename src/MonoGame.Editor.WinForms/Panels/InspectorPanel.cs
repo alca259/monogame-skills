@@ -22,6 +22,7 @@ public sealed class InspectorPanel : UserControl
 
     private EditorContext?      _context;
     private GameObjectRegistry? _registry;
+    private PrefabManager?      _prefabManager;
     private EditorGameObject?   _currentObject;
     private bool                _suppressUpdate;
 
@@ -51,10 +52,11 @@ public sealed class InspectorPanel : UserControl
     #region Initialization
 
     /// <summary>Connects this panel to the editor context and behaviour registry.</summary>
-    public void Initialize(EditorContext context, GameObjectRegistry? registry = null)
+    public void Initialize(EditorContext context, GameObjectRegistry? registry = null, PrefabManager? prefabManager = null)
     {
-        _context  = context;
-        _registry = registry;
+        _context       = context;
+        _registry      = registry;
+        _prefabManager = prefabManager;
 
         _onUndo = _ => RebuildSafe();
         _onRedo = _ => RebuildSafe();
@@ -126,6 +128,16 @@ public sealed class InspectorPanel : UserControl
 
         int y     = SidePadding;
         int width = ContentWidth();
+
+        // Prefab header (only when the object is a prefab instance)
+        if (_currentObject.PrefabPath is not null && _prefabManager is not null)
+        {
+            Control prefabHeader = BuildPrefabHeader(_currentObject);
+            prefabHeader.Location = new System.Drawing.Point(SidePadding, y);
+            prefabHeader.Width    = width;
+            _scrollPanel.Controls.Add(prefabHeader);
+            y += prefabHeader.Height + SectionGap;
+        }
 
         // Transform section
         Control transformSection = BuildTransformSection(_currentObject);
@@ -512,6 +524,61 @@ public sealed class InspectorPanel : UserControl
             Increment     = 0.1m,
         };
         return num;
+    }
+
+    #endregion
+
+    #region Prefab header
+
+    private Control BuildPrefabHeader(EditorGameObject obj)
+    {
+        string fileName = Path.GetFileName(obj.PrefabPath ?? string.Empty);
+
+        Panel panel = new Panel
+        {
+            Height    = 32,
+            BackColor = System.Drawing.Color.FromArgb(50, 100, 180),
+            Padding   = new System.Windows.Forms.Padding(4, 2, 4, 2),
+        };
+
+        Label label = new Label
+        {
+            Text      = $"Prefab: {fileName}",
+            Dock      = DockStyle.Left,
+            Width     = 200,
+            TextAlign = System.Drawing.ContentAlignment.MiddleLeft,
+            ForeColor = System.Drawing.Color.White,
+        };
+
+        Button applyBtn = new Button
+        {
+            Text  = "Apply",
+            Dock  = DockStyle.Right,
+            Width = 55,
+        };
+        applyBtn.Click += (_, _) =>
+        {
+            if (obj.PrefabPath is null || _prefabManager is null) return;
+            _context!.Commands.Execute(new ApplyPrefabCommand(obj, obj.PrefabPath, _prefabManager));
+        };
+
+        Button revertBtn = new Button
+        {
+            Text  = "Revert",
+            Dock  = DockStyle.Right,
+            Width = 55,
+        };
+        revertBtn.Click += (_, _) =>
+        {
+            if (obj.PrefabPath is null || _prefabManager is null) return;
+            _context!.Commands.Execute(new RevertPrefabCommand(obj, obj.PrefabPath, _prefabManager));
+            RebuildContent();
+        };
+
+        panel.Controls.Add(applyBtn);
+        panel.Controls.Add(revertBtn);
+        panel.Controls.Add(label);
+        return panel;
     }
 
     #endregion

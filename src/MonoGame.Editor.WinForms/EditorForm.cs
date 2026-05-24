@@ -6,6 +6,7 @@ public sealed partial class EditorForm : Form
     private readonly EditorContext _context = null!;
     private readonly EditorPreferences _preferences = null!;
     private readonly GameObjectRegistry _registry = null!;
+    private readonly PrefabManager _prefabManager = new();
     private readonly GizmoController _gizmoCtrl = new();
     private GizmoRenderer? _gizmoRenderer;
     private readonly ContentWatcher _contentWatcher = null!;
@@ -88,8 +89,8 @@ public sealed partial class EditorForm : Form
         _gizmoRenderer = new GizmoRenderer(_gizmoCtrl);
 
         // Initialize panels
-        _hierarchyPanel.Initialize(_context);
-        _inspectorPanel.Initialize(_context, _registry);
+        _hierarchyPanel.Initialize(_context, _prefabManager);
+        _inspectorPanel.Initialize(_context, _registry, _prefabManager);
         _assetBrowserPanel.Initialize(_context);
 
         // Build menus programmatically (avoids Designer.cs C#-version concerns)
