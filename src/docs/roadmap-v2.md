@@ -18,8 +18,6 @@ Las fases 1–6 han sido completadas con 702 tests de cobertura. Este roadmap cu
 
 **Reglas transversales a todos los desarrollos:**
 - Al terminar, actualizar este fichero marcando los TODOs completados.
-- Al terminar el desarrollo de una fase, **debe** escribirse el correspondiente test unitario con xUnit en `src\Alca.MonoGame.Kernel.UnitTests`.
-- Los ficheros de test siguen la nomenclatura de la carpeta origen; si un servicio está en `ECS/GameEntity.cs`, el test va en `ECS/GameEntityTests.cs`.
 
 ---
 
@@ -442,60 +440,5 @@ src/
 | `MonoGame.Extended` | 6.0.* | Particles, Tweening, Tiled, BitmapFonts |
 | `Microsoft.Extensions.DependencyInjection` | 10.0.* | DI container |
 | `Microsoft.Extensions.Localization` | 10.0.* | IStringLocalizer |
-| `tainicom.Aether.Physics2D` | 2.* | **FASE 8** — añadir cuando se implemente |
+| `Aether.Physics2D` | 2.* | **FASE 8** — añadir cuando se implemente |
 
-### Dependencias NuGet (Tests)
-
-| Paquete | Versión |
-|---------|---------|
-| `xunit` | 2.9.3 |
-| `xunit.runner.visualstudio` | 3.1.4 |
-| `Microsoft.NET.Test.Sdk` | 17.14.1 |
-| `coverlet.collector` | 6.0.4 |
-| `MonoGame.Framework.DesktopGL` | 3.8.* (`PrivateAssets=All`) |
-| `Microsoft.Extensions.DependencyInjection` | 10.0.* |
-
-### Convenciones de tests
-
-- Framework: **xUnit** con atributo `[Fact]`
-- Clases de test: `sealed`, un fichero por clase testeada
-- Nomenclatura de fichero: `{NombreClase}Tests.cs`
-- Ubicación en tests: espeja la carpeta origen en Kernel
-  - Ejemplo: `ECS/TransformBehaviour.cs` → `Tests/ECS/TransformBehaviourTests.cs`
-- Patrón de nombre de test: `Método_Escenario_ResultadoEsperado`
-- Aserciones: `Assert.*` de xUnit; `Assert.Equal(expected, actual, precision)` para floats
-
-### Tests con GraphicsDevice (GPU)
-
-`GraphicsDevice` requiere un contexto SDL2+OpenGL real. **No usar WinForms** — el proyecto usa `MonoGame.Framework.DesktopGL` (SDL2/OpenGL), no DirectX; los handles de WinForms no son compatibles.
-
-**Infraestructura disponible en `UnitTests/Fixtures/`:**
-
-| Clase | Rol |
-|-------|-----|
-| `GraphicsDeviceFixture` | Crea un `Game` headless (ventana 1×1) que sale tras un frame; expone `GraphicsDevice` y `SpriteBatch` vivos hasta `Dispose()` |
-| `GraphicsCollectionDefinition` | `[CollectionDefinition]` de xUnit — una sola instancia del fixture por colección |
-| `GraphicsCollection.Name` | Constante `"GraphicsDevice"` |
-
-**Patrón de uso:**
-
-```csharp
-[Collection(GraphicsCollection.Name)]
-public sealed class MiClaseGpuTests
-{
-    private readonly GraphicsDeviceFixture _fx;
-
-    public MiClaseGpuTests(GraphicsDeviceFixture fx) => _fx = fx;
-
-    [Fact]
-    public void Constructor_ConArgumentosValidos_NoLanzaExcepcion()
-    {
-        using var sut = new MiClase(_fx.GraphicsDevice);
-        Assert.NotNull(sut);
-    }
-}
-```
-
-- Todos los tests que compartan `[Collection(GraphicsCollection.Name)]` reutilizan **la misma instancia** del fixture (barato en tiempo de setup).
-- Tests sin GPU siguen siendo clases normales (sin `[Collection]`).
-- `_fx.SpriteBatch` está disponible para clases que lo necesiten como argumento.

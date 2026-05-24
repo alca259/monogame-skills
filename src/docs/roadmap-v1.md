@@ -848,19 +848,6 @@ src/
 | `MonoGame.Extended` | 6.0.* | Incluye Particles, Tweening, Tiled, BitmapFonts |
 | `Microsoft.Extensions.DependencyInjection` | 10.0.* | DI container |
 
-### Dependencias NuGet (Tests)
-
-| Paquete | Versión |
-|---------|---------|
-| `xunit` | 2.9.3 |
-| `xunit.runner.visualstudio` | 3.1.4 |
-| `Microsoft.NET.Test.Sdk` | 17.14.1 |
-| `coverlet.collector` | 6.0.4 |
-| `MonoGame.Framework.DesktopGL` | 3.8.* (`PrivateAssets=All`) |
-| `Microsoft.Extensions.DependencyInjection` | 10.0.* |
-
-El proyecto de tests referencia directamente el proyecto Kernel. Los tipos de `MonoGame.Extended` son accesibles transitivamente sin necesidad de añadir la referencia explícita en el csproj de tests.
-
 ### Global Usings
 
 **Kernel** (`Globals.cs`):
@@ -874,25 +861,6 @@ global using Microsoft.Xna.Framework.Media;
 global using Microsoft.Extensions.DependencyInjection;
 ```
 
-**Tests** (`Globals.cs`):
-```csharp
-global using Microsoft.Xna.Framework;
-global using Microsoft.Xna.Framework.Graphics;
-global using Alca.MonoGame.Kernel.Mathematics;
-global using Alca.MonoGame.Kernel.Graphics.Camera;
-```
-Los tests deben añadir `using` explícitos para cualquier otro namespace de Kernel o MonoGame.Extended que necesiten.
-
-### Convenciones de tests
-
-- Framework: **xUnit** con atributo `[Fact]`
-- Clases de test: `sealed`, un fichero por clase testeada
-- Nomenclatura de fichero: `{NombreClase}Tests.cs`
-- Ubicación en tests: espeja la carpeta origen en Kernel  
-  Ejemplo: `Kernel/Audio/SoundEffectPool.cs` → `Tests/Audio/SoundEffectPoolTests.cs`
-- Patrón de nombre de test: `Método_Escenario_ResultadoEsperado`
-- Aserciones: `Assert.*` de xUnit, con tolerancia decimal `(expected, actual, precision)` para floats
-
 ### Notas de API críticas
 
 **Tweener.TweenTo constraint:** El método genérico `Tweener.TweenTo<TTarget, TMember>` de MonoGame.Extended impone `where TTarget : class`. Cualquier wrapper que exponga este método debe propagar la misma restricción:
@@ -903,5 +871,3 @@ public Tween TweenTo<T>(T target, ...) where T : class { ... }
 **Easing functions:** En MonoGame.Extended 6.0 no existe el delegado `EasingFunction`. Las funciones de easing son métodos estáticos en `EasingFunctions` con firma `float Method(float value)`, compatibles con `Func<float, float>`.
 
 **ParticleEmitter constructors:** `ParticleEmitter()` y `ParticleEmitter(int initialCapacity)`. La `TextureRegion` (`Texture2DRegion`) es una propiedad, no un parámetro de constructor — puede ser `null` en tests sin crash.
-
-**Tests con hardware de audio:** `SoundEffect` y `SoundEffectInstance` requieren OpenAL inicializado. Los tests de `SoundEffectPool` que necesiten instanciar un `SoundEffect` real deben marcarse con `[Trait("Category", "RequiresAudio")]` o validarse mediante reflexión sobre la API pública.
