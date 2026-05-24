@@ -8,6 +8,9 @@
 
 ## Proyecto Demo
 
+**Reglas transversales a todos los desarrollos:**
+- Al terminar, actualizar este fichero marcando los TODOs completados.
+
 **`src/Alca.MonoGame.Demo/`** — proyecto ejecutable (`OutputType=WinExe`)
 - `DemoGame.cs` — `sealed class DemoGame : Core`
 - Escenas ECS:

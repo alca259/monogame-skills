@@ -2,6 +2,8 @@
 
 **Stack**: .NET 10 · C# 14 · WinForms · MonoGame · MonoGame.Extended · MonoGame.Framework.WindowsDX · Alca.MonoGame.Kernel · System.Text.Json  
 **Objetivo**: Editor de juegos 2D estilo Unity, integrado con Visual Studio, con viewport MonoGame embebido, jerarquía ECS, gizmos de transform, editores especializados y pipeline de build.
+**Reglas transversales a todos los desarrollos:**
+- Al terminar, actualizar este fichero marcando los TODOs completados.
 
 ---
 
@@ -29,6 +31,8 @@ MonoGame.Editor.sln
 ├── MonoGame.Editor.WinForms      # Aplicación WinForms — referencia Editor.Core
 └── MonoGame.Editor.Templates     # Plantillas dotnet new para proyectos de juego nuevos
 ```
+
+- El nuget de Alca.MonoGame.Kernel está una carpeta local "F:\Dev\NugetLocal\Alca.MonoGame.Kernel.1.0.0.nupkg" en principio está registrada como fuente de nugets bajo el nombre "DevLocal"
 
 **Reglas de arquitectura:**
 - `MonoGame.Editor.Core` no contiene ninguna referencia a `System.Windows.Forms`
