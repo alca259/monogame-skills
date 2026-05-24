@@ -3,8 +3,18 @@ namespace Alca.MonoGame.Kernel.ECS;
 /// <summary>Base class for all component logic. Override only the lifecycle hooks you need.</summary>
 public abstract class GameBehaviour
 {
-    /// <summary>Gets the entity this behaviour is attached to.</summary>
-    public GameEntity Entity { get; internal set; } = null!;
+    private GameEntity? _entity;
+
+    /// <summary>
+    /// Gets the entity this behaviour is attached to.
+    /// Guaranteed non-null from <see cref="Awake"/> onward.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">Thrown if accessed before the behaviour is attached to a <see cref="GameEntity"/>.</exception>
+    public GameEntity Entity => _entity ?? throw new InvalidOperationException(
+        "This behaviour is not attached to a GameEntity. Access Entity only from Awake() or later lifecycle methods.");
+
+    /// <summary>Gets the entity this behaviour is attached to, or null if not yet attached. For subclass use only.</summary>
+    protected GameEntity? EntityOrNull => _entity;
 
     /// <summary>Gets or sets a value indicating whether this behaviour participates in Update and Draw.</summary>
     public bool Enabled { get; set; } = true;
@@ -23,4 +33,11 @@ public abstract class GameBehaviour
 
     /// <summary>Called when the entity is destroyed.</summary>
     public virtual void OnDestroy() { }
+
+    internal void SetEntityInternal(GameEntity entity)
+    {
+        if (_entity is not null)
+            throw new InvalidOperationException("This behaviour is already attached to a GameEntity and cannot be reassigned.");
+        _entity = entity;
+    }
 }

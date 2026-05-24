@@ -108,6 +108,26 @@ public sealed class GameBehaviourTests
         Assert.Same(entity, spy.Entity);
     }
 
+    [Fact]
+    public void Entity_ThrowsInvalidOperationException_WhenAccessedBeforeAttaching()
+    {
+        var spy = new LifecycleSpy();
+
+        Assert.Throws<InvalidOperationException>(() => _ = spy.Entity);
+    }
+
+    [Fact]
+    public void Entity_ThrowsInvalidOperationException_WhenAttachedToSecondEntity()
+    {
+        var world = new GameWorld();
+        var spy = new LifecycleSpy();
+        var entity = world.CreateEntity("E");
+        entity.Add(spy);
+
+        var entity2 = world.CreateEntity("E2");
+        Assert.Throws<InvalidOperationException>(() => entity2.Add(spy));
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────────────
 
     private sealed class LifecycleSpy : GameBehaviour

@@ -252,8 +252,6 @@ public sealed class GameEntityTests
         Assert.Equal(typeof(GameBehaviour), method?.DeclaringType);
     }
 
-    // ── Helpers ────────────────────────────────────────────────────────────────
-
     private interface ICounter
     {
         int UpdateCount { get; }
@@ -266,4 +264,374 @@ public sealed class GameEntityTests
     }
 
     private sealed class AnotherBehaviour : GameBehaviour { }
+
+    // ── Hierarchy ──────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void SetParent_SetsParentAndAddsToChildrenList()
+    {
+        var world = new GameWorld();
+        var parent = world.CreateEntity("Parent");
+        var child = world.CreateEntity("Child");
+
+        child.SetParent(parent);
+
+        Assert.Same(parent, child.Parent);
+        Assert.Contains(child, parent.Children);
+    }
+
+    [Fact]
+    public void SetParent_ClearsParent_WhenNullPassed()
+    {
+        var world = new GameWorld();
+        var parent = world.CreateEntity("Parent");
+        var child = world.CreateEntity("Child");
+        child.SetParent(parent);
+
+        child.SetParent(null);
+
+        Assert.Null(child.Parent);
+        Assert.DoesNotContain(child, parent.Children);
+    }
+
+    [Fact]
+    public void IsChildOf_ReturnsTrue_ForDirectParent()
+    {
+        var world = new GameWorld();
+        var parent = world.CreateEntity("Parent");
+        var child = world.CreateEntity("Child");
+        child.SetParent(parent);
+
+        Assert.True(child.IsChildOf(parent));
+    }
+
+    [Fact]
+    public void IsChildOf_ReturnsTrue_ForIndirectParent()
+    {
+        var world = new GameWorld();
+        var root = world.CreateEntity("Root");
+        var mid = world.CreateEntity("Mid");
+        var leaf = world.CreateEntity("Leaf");
+        mid.SetParent(root);
+        leaf.SetParent(mid);
+
+        Assert.True(leaf.IsChildOf(root));
+    }
+
+    [Fact]
+    public void IsChildOf_ReturnsFalse_WhenNotInHierarchy()
+    {
+        var world = new GameWorld();
+        var a = world.CreateEntity("A");
+        var b = world.CreateEntity("B");
+
+        Assert.False(a.IsChildOf(b));
+        Assert.False(b.IsChildOf(a));
+    }
+
+    [Fact]
+    public void ChildCount_IncrementsWhenChildAdded()
+    {
+        var world = new GameWorld();
+        var parent = world.CreateEntity("Parent");
+
+        world.CreateEntity("C1").SetParent(parent);
+        world.CreateEntity("C2").SetParent(parent);
+
+        Assert.Equal(2, parent.ChildCount);
+    }
+
+    [Fact]
+    public void GetSiblingIndex_ReturnsCorrectIndex()
+    {
+        var world = new GameWorld();
+        var parent = world.CreateEntity("Parent");
+        var c0 = world.CreateEntity("C0");
+        var c1 = world.CreateEntity("C1");
+        c0.SetParent(parent);
+        c1.SetParent(parent);
+
+        Assert.Equal(0, c0.GetSiblingIndex());
+        Assert.Equal(1, c1.GetSiblingIndex());
+    }
+
+    [Fact]
+    public void SetAsFirstSibling_MovesToFront()
+    {
+        var world = new GameWorld();
+        var parent = world.CreateEntity("Parent");
+        var c0 = world.CreateEntity("C0");
+        var c1 = world.CreateEntity("C1");
+        c0.SetParent(parent);
+        c1.SetParent(parent);
+
+        c1.SetAsFirstSibling();
+
+        Assert.Equal(0, c1.GetSiblingIndex());
+    }
+
+    [Fact]
+    public void Root_ReturnsSelf_WhenNoParent()
+    {
+        var world = new GameWorld();
+        var entity = world.CreateEntity("E");
+
+        Assert.Same(entity, entity.Root);
+    }
+
+    [Fact]
+    public void Root_ReturnsTopLevelEntity_WhenNested()
+    {
+        var world = new GameWorld();
+        var root = world.CreateEntity("Root");
+        var mid = world.CreateEntity("Mid");
+        var leaf = world.CreateEntity("Leaf");
+        mid.SetParent(root);
+        leaf.SetParent(mid);
+
+        Assert.Same(root, leaf.Root);
+    }
+
+    [Fact]
+    public void Find_FindsChildByName_InNestedHierarchy()
+    {
+        var world = new GameWorld();
+        var root = world.CreateEntity("Root");
+        var mid = world.CreateEntity("Mid");
+        var leaf = world.CreateEntity("Target");
+        mid.SetParent(root);
+        leaf.SetParent(mid);
+
+        var found = root.Find("Target");
+
+        Assert.Same(leaf, found);
+    }
+
+    [Fact]
+    public void Find_ReturnsNull_WhenNameNotFound()
+    {
+        var world = new GameWorld();
+        var root = world.CreateEntity("Root");
+
+        Assert.Null(root.Find("Nobody"));
+    }
+
+    [Fact]
+    public void DetachChildren_RemovesAllChildren()
+    {
+        var world = new GameWorld();
+        var parent = world.CreateEntity("Parent");
+        world.CreateEntity("C1").SetParent(parent);
+        world.CreateEntity("C2").SetParent(parent);
+
+        parent.DetachChildren();
+
+        Assert.Equal(0, parent.ChildCount);
+    }
+
+    [Fact]
+    public void TraverseDown_VisitsThisAndAllDescendants()
+    {
+        var world = new GameWorld();
+        var root = world.CreateEntity("Root");
+        var mid = world.CreateEntity("Mid");
+        var leaf = world.CreateEntity("Leaf");
+        mid.SetParent(root);
+        leaf.SetParent(mid);
+        var visited = new List<string>();
+
+        root.TraverseDown(e => visited.Add(e.Name));
+
+        Assert.Equal(new[] { "Root", "Mid", "Leaf" }, visited);
+    }
+
+    [Fact]
+    public void TraverseUp_VisitsThisAndAllAncestors()
+    {
+        var world = new GameWorld();
+        var root = world.CreateEntity("Root");
+        var mid = world.CreateEntity("Mid");
+        var leaf = world.CreateEntity("Leaf");
+        mid.SetParent(root);
+        leaf.SetParent(mid);
+        var visited = new List<string>();
+
+        leaf.TraverseUp(e => visited.Add(e.Name));
+
+        Assert.Equal(new[] { "Leaf", "Mid", "Root" }, visited);
+    }
+
+    // ── Tags ───────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void AddTag_And_HasTag_ReturnTrue()
+    {
+        var world = new GameWorld();
+        var entity = world.CreateEntity("E");
+        entity.AddTag("enemy");
+
+        Assert.True(entity.HasTag("enemy"));
+        Assert.False(entity.HasTag("player"));
+    }
+
+    [Fact]
+    public void RemoveTag_RemovesExistingTag()
+    {
+        var world = new GameWorld();
+        var entity = world.CreateEntity("E");
+        entity.AddTag("enemy");
+        entity.RemoveTag("enemy");
+
+        Assert.False(entity.HasTag("enemy"));
+    }
+
+    [Fact]
+    public void CompareTag_DelegatesToHasTag()
+    {
+        var world = new GameWorld();
+        var entity = world.CreateEntity("E");
+        entity.AddTag("player");
+
+        Assert.True(entity.CompareTag("player"));
+        Assert.False(entity.CompareTag("enemy"));
+    }
+
+    // ── New component API ──────────────────────────────────────────────────────
+
+    [Fact]
+    public void AddComponent_ReturnsNewBehaviour_WithEntitySet()
+    {
+        var world = new GameWorld();
+        var entity = world.CreateEntity("E");
+
+        var b = entity.AddComponent<CounterBehaviour>();
+
+        Assert.NotNull(b);
+        Assert.Same(entity, b.Entity);
+    }
+
+    [Fact]
+    public void SetActive_SetsActiveFlag()
+    {
+        var world = new GameWorld();
+        var entity = world.CreateEntity("E");
+        entity.SetActive(false);
+
+        Assert.False(entity.Active);
+    }
+
+    [Fact]
+    public void GetComponentCount_IncludesTransformAndAllAdded()
+    {
+        var world = new GameWorld();
+        var entity = world.CreateEntity("E");
+        entity.Add(new CounterBehaviour());
+        entity.Add(new AnotherBehaviour());
+
+        // TransformBehaviour + CounterBehaviour + AnotherBehaviour = 3
+        Assert.Equal(3, entity.GetComponentCount());
+    }
+
+    [Fact]
+    public void GetComponentAtIndex_ReturnsCorrectBehaviour()
+    {
+        var world = new GameWorld();
+        var entity = world.CreateEntity("E");
+        var b = new CounterBehaviour();
+        entity.Add(b);
+
+        // Index 0 = TransformBehaviour, index 1 = CounterBehaviour
+        Assert.Same(b, entity.GetComponentAtIndex(1));
+    }
+
+    [Fact]
+    public void GetComponentIndex_ReturnsCorrectIndex()
+    {
+        var world = new GameWorld();
+        var entity = world.CreateEntity("E");
+        var b = new CounterBehaviour();
+        entity.Add(b);
+
+        Assert.Equal(1, entity.GetComponentIndex(b));
+    }
+
+    [Fact]
+    public void GetComponents_FillsResultsWithAllMatchingBehaviours()
+    {
+        var world = new GameWorld();
+        var entity = world.CreateEntity("E");
+        var b = new CounterBehaviour();
+        entity.Add(b);
+        var results = new List<ICounter>();
+
+        entity.GetComponents<ICounter>(results);
+
+        Assert.Single(results);
+        Assert.Same(b, results[0]);
+    }
+
+    [Fact]
+    public void GetComponentInChildren_FindsComponentInDirectChild()
+    {
+        var world = new GameWorld();
+        var parent = world.CreateEntity("Parent");
+        var child = world.CreateEntity("Child");
+        child.SetParent(parent);
+        var b = new CounterBehaviour();
+        child.Add(b);
+
+        var result = parent.GetComponentInChildren<CounterBehaviour>();
+
+        Assert.Same(b, result);
+    }
+
+    [Fact]
+    public void GetComponentInChildren_SkipsInactiveChild_WhenIncludeInactiveFalse()
+    {
+        var world = new GameWorld();
+        var parent = world.CreateEntity("Parent");
+        var child = world.CreateEntity("Child");
+        child.SetParent(parent);
+        child.Active = false;
+        child.Add(new CounterBehaviour());
+
+        var result = parent.GetComponentInChildren<CounterBehaviour>(includeInactive: false);
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void GetComponentInParent_FindsComponentInDirectParent()
+    {
+        var world = new GameWorld();
+        var parent = world.CreateEntity("Parent");
+        var child = world.CreateEntity("Child");
+        child.SetParent(parent);
+        var b = new CounterBehaviour();
+        parent.Add(b);
+
+        var result = child.GetComponentInParent<CounterBehaviour>();
+
+        Assert.Same(b, result);
+    }
+
+    [Fact]
+    public void GetComponentsInChildren_FillsResultsFromAllDescendants()
+    {
+        var world = new GameWorld();
+        var root = world.CreateEntity("Root");
+        var child1 = world.CreateEntity("C1");
+        var child2 = world.CreateEntity("C2");
+        child1.SetParent(root);
+        child2.SetParent(root);
+        child1.Add(new CounterBehaviour());
+        child2.Add(new CounterBehaviour());
+        var results = new List<CounterBehaviour>();
+
+        root.GetComponentsInChildren<CounterBehaviour>(results);
+
+        Assert.Equal(2, results.Count);
+    }
+
+    // ── Helpers ────────────────────────────────────────────────────────────────
 }

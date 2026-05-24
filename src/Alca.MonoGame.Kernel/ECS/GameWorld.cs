@@ -93,6 +93,20 @@ public sealed class GameWorld
         return null;
     }
 
+    /// <summary>Fills <paramref name="results"/> with all entities that have the given tag.</summary>
+    public void GetEntitiesByTag(string tag, List<GameEntity> results)
+    {
+        for (int i = 0; i < _entities.Count; i++)
+            if (_entities[i].HasTag(tag)) results.Add(_entities[i]);
+    }
+
+    /// <summary>Fills <paramref name="results"/> with all behaviours in the world assignable to <typeparamref name="T"/>.</summary>
+    public void GetBehavioursWithInterface<T>(List<T> results) where T : class
+    {
+        for (int i = 0; i < _entities.Count; i++)
+            _entities[i].GetComponents<T>(results);
+    }
+
     // ── Internal ───────────────────────────────────────────────────────────────
 
     private void FlushPending()
