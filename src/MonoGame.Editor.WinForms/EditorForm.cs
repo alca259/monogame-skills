@@ -40,6 +40,7 @@ public sealed partial class EditorForm : Form
         _viewInspectorMenuItem.Checked    = _preferences.InspectorVisible;
         _viewAssetBrowserMenuItem.Checked = _preferences.AssetBrowserVisible;
         _viewConsoleMenuItem.Checked      = _preferences.ConsoleVisible;
+        _assetBrowserPanel.SplitterDistance = _preferences.AssetBrowserSplitterDistance;
 
         UpdatePanelVisibility();
     }
@@ -47,19 +48,29 @@ public sealed partial class EditorForm : Form
     private static int ClampSplitter(int value, int min, int max)
         => max < min ? min : Math.Clamp(value, min, max);
 
+    private void CenterPlaybackStrip()
+    {
+        // Center relative to full toolbar width (not just the fill cell)
+        int x = (_toolbarTable.Width - _playbackStrip.Width) / 2 - _playbackCell.Left;
+        int y = (_playbackCell.Height - _playbackStrip.Height) / 2;
+        _playbackStrip.Location = new System.Drawing.Point(Math.Max(0, x), Math.Max(0, y));
+    }
+
     private void WireEvents()
     {
-        Shown += (_, _) => ApplyPreferences();
+        Shown += (_, _) => { ApplyPreferences(); CenterPlaybackStrip(); };
         _context.EventBus.Subscribe<EditorStateChangedEvent>(OnEditorStateChanged);
         FormClosing += (_, _) => SavePreferences();
         _viewport.RenderFrame += OnViewportRenderFrame;
+        _toolbarTable.Resize += (_, _) => CenterPlaybackStrip();
     }
 
     private void SavePreferences()
     {
-        _preferences.LeftPanelWidth      = _outerSplit.SplitterDistance;
-        _preferences.RightPanelWidth     = _innerSplit.Width - _innerSplit.SplitterDistance;
-        _preferences.ConsolePanelHeight  = _mainSplit.Height - _mainSplit.SplitterDistance;
+        _preferences.LeftPanelWidth               = _outerSplit.SplitterDistance;
+        _preferences.RightPanelWidth              = _innerSplit.Width - _innerSplit.SplitterDistance;
+        _preferences.ConsolePanelHeight           = _mainSplit.Height - _mainSplit.SplitterDistance;
+        _preferences.AssetBrowserSplitterDistance = _assetBrowserPanel.SplitterDistance;
         _preferences.HierarchyVisible    = _viewHierarchyMenuItem.Checked;
         _preferences.InspectorVisible    = _viewInspectorMenuItem.Checked;
         _preferences.AssetBrowserVisible = _viewAssetBrowserMenuItem.Checked;
@@ -158,6 +169,28 @@ public sealed partial class EditorForm : Form
     }
 
     private void OnViewMenuItemClick(object? sender, EventArgs e) => UpdatePanelVisibility();
+
+    private void OnResetLayoutClick(object? sender, EventArgs e) => ResetLayout();
+
+    private void ResetLayout()
+    {
+        EditorPreferences defaults = new();
+
+        _viewHierarchyMenuItem.Checked    = defaults.HierarchyVisible;
+        _viewInspectorMenuItem.Checked    = defaults.InspectorVisible;
+        _viewAssetBrowserMenuItem.Checked = defaults.AssetBrowserVisible;
+        _viewConsoleMenuItem.Checked      = defaults.ConsoleVisible;
+        UpdatePanelVisibility();
+
+        _outerSplit.Panel1MinSize = 180;
+        _innerSplit.Panel2MinSize = 220;
+        _mainSplit.Panel2MinSize  = 80;
+
+        _outerSplit.SplitterDistance = ClampSplitter(defaults.LeftPanelWidth, 180, _outerSplit.Width - 180);
+        _innerSplit.SplitterDistance = ClampSplitter(_innerSplit.Width - defaults.RightPanelWidth, 320, _innerSplit.Width - 220);
+        _mainSplit.SplitterDistance  = ClampSplitter(_mainSplit.Height - defaults.ConsolePanelHeight, 240, _mainSplit.Height - 80);
+        _assetBrowserPanel.SplitterDistance = defaults.AssetBrowserSplitterDistance;
+    }
 
     #endregion
 

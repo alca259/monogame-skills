@@ -18,23 +18,28 @@ partial class EditorForm
     private ToolStripMenuItem _viewInspectorMenuItem = null!;
     private ToolStripMenuItem _viewAssetBrowserMenuItem = null!;
     private ToolStripMenuItem _viewConsoleMenuItem = null!;
+    private ToolStripSeparator _viewMenuSeparator1 = null!;
+    private ToolStripMenuItem _resetLayoutMenuItem = null!;
     private ToolStripMenuItem _projectMenu = null!;
     private ToolStripMenuItem _debugMenu = null!;
 
-    // ── Status ────────────────────────────────────────────────────────────
-    private StatusStrip _statusStrip = null!;
-    private ToolStripStatusLabel _statusLabel = null!;
-
-    // ── Vertical tool strip (left of viewport) ────────────────────────────
-    private ToolStrip _toolStrip = null!;
-    private ToolStripButton _playButton = null!;
-    private ToolStripButton _pauseButton = null!;
-    private ToolStripButton _stopButton = null!;
-    private ToolStripSeparator _toolStripSeparator1 = null!;
+    // ── Horizontal toolbar ────────────────────────────────────────────────
+    // Col 0 (AutoSize): gizmo buttons  |  Col 1 (Fill): centered play buttons
+    private TableLayoutPanel _toolbarTable = null!;
+    private ToolStrip _gizmoStrip = null!;
     private ToolStripButton _selectModeButton = null!;
     private ToolStripButton _moveModeButton = null!;
     private ToolStripButton _rotateModeButton = null!;
     private ToolStripButton _scaleModeButton = null!;
+    private Panel _playbackCell = null!;
+    private ToolStrip _playbackStrip = null!;
+    private ToolStripButton _playButton = null!;
+    private ToolStripButton _pauseButton = null!;
+    private ToolStripButton _stopButton = null!;
+
+    // ── Status ────────────────────────────────────────────────────────────
+    private StatusStrip _statusStrip = null!;
+    private ToolStripStatusLabel _statusLabel = null!;
 
     // ── Split containers ──────────────────────────────────────────────────
     private SplitContainer _mainSplit = null!;
@@ -42,7 +47,6 @@ partial class EditorForm
     private SplitContainer _innerSplit = null!;
 
     // ── Panels ────────────────────────────────────────────────────────────
-    private Panel _viewportArea = null!;
     private SceneHierarchyPanel _hierarchyPanel = null!;
     private MonoGameControl _viewport = null!;
     private InspectorPanel _inspectorPanel = null!;
@@ -64,44 +68,49 @@ partial class EditorForm
     {
         components = new System.ComponentModel.Container();
 
-        _mainMenuStrip        = new MenuStrip();
-        _fileMenu             = new ToolStripMenuItem();
-        _newProjectItem       = new ToolStripMenuItem();
-        _openProjectItem      = new ToolStripMenuItem();
-        _fileSeparator        = new ToolStripSeparator();
-        _exitItem             = new ToolStripMenuItem();
-        _editMenu             = new ToolStripMenuItem();
-        _viewMenu             = new ToolStripMenuItem();
+        _mainMenuStrip            = new MenuStrip();
+        _fileMenu                 = new ToolStripMenuItem();
+        _newProjectItem           = new ToolStripMenuItem();
+        _openProjectItem          = new ToolStripMenuItem();
+        _fileSeparator            = new ToolStripSeparator();
+        _exitItem                 = new ToolStripMenuItem();
+        _editMenu                 = new ToolStripMenuItem();
+        _viewMenu                 = new ToolStripMenuItem();
         _viewHierarchyMenuItem    = new ToolStripMenuItem();
         _viewInspectorMenuItem    = new ToolStripMenuItem();
         _viewAssetBrowserMenuItem = new ToolStripMenuItem();
         _viewConsoleMenuItem      = new ToolStripMenuItem();
-        _projectMenu          = new ToolStripMenuItem();
-        _debugMenu            = new ToolStripMenuItem();
-        _statusStrip          = new StatusStrip();
-        _statusLabel          = new ToolStripStatusLabel();
-        _toolStrip            = new ToolStrip();
-        _playButton           = new ToolStripButton();
-        _pauseButton          = new ToolStripButton();
-        _stopButton           = new ToolStripButton();
-        _toolStripSeparator1  = new ToolStripSeparator();
-        _selectModeButton     = new ToolStripButton();
-        _moveModeButton       = new ToolStripButton();
-        _rotateModeButton     = new ToolStripButton();
-        _scaleModeButton      = new ToolStripButton();
-        _mainSplit            = new SplitContainer();
-        _outerSplit           = new SplitContainer();
-        _hierarchyPanel       = new SceneHierarchyPanel();
-        _innerSplit           = new SplitContainer();
-        _viewportArea         = new Panel();
-        _viewport             = new MonoGameControl();
-        _inspectorPanel       = new InspectorPanel();
-        _bottomTabControl     = new TabControl();
-        _assetsTab            = new TabPage();
-        _assetBrowserPanel    = new AssetBrowserPanel();
-        _consoleTab           = new TabPage();
-        _consolePanel         = new ConsolePanel();
+        _viewMenuSeparator1       = new ToolStripSeparator();
+        _resetLayoutMenuItem      = new ToolStripMenuItem();
+        _projectMenu              = new ToolStripMenuItem();
+        _debugMenu                = new ToolStripMenuItem();
+        _toolbarTable             = new TableLayoutPanel();
+        _gizmoStrip               = new ToolStrip();
+        _selectModeButton         = new ToolStripButton();
+        _moveModeButton           = new ToolStripButton();
+        _rotateModeButton         = new ToolStripButton();
+        _scaleModeButton          = new ToolStripButton();
+        _playbackCell             = new Panel();
+        _playbackStrip            = new ToolStrip();
+        _playButton               = new ToolStripButton();
+        _pauseButton              = new ToolStripButton();
+        _stopButton               = new ToolStripButton();
+        _statusStrip              = new StatusStrip();
+        _statusLabel              = new ToolStripStatusLabel();
+        _mainSplit                = new SplitContainer();
+        _outerSplit               = new SplitContainer();
+        _hierarchyPanel           = new SceneHierarchyPanel();
+        _innerSplit               = new SplitContainer();
+        _viewport                 = new MonoGameControl();
+        _inspectorPanel           = new InspectorPanel();
+        _bottomTabControl         = new TabControl();
+        _assetsTab                = new TabPage();
+        _assetBrowserPanel        = new AssetBrowserPanel();
+        _consoleTab               = new TabPage();
+        _consolePanel             = new ConsolePanel();
 
+        _toolbarTable.SuspendLayout();
+        _playbackCell.SuspendLayout();
         ((System.ComponentModel.ISupportInitialize)_mainSplit).BeginInit();
         _mainSplit.Panel1.SuspendLayout();
         _mainSplit.Panel2.SuspendLayout();
@@ -114,7 +123,6 @@ partial class EditorForm
         _innerSplit.Panel1.SuspendLayout();
         _innerSplit.Panel2.SuspendLayout();
         _innerSplit.SuspendLayout();
-        _viewportArea.SuspendLayout();
         _assetsTab.SuspendLayout();
         _consoleTab.SuspendLayout();
         SuspendLayout();
@@ -161,7 +169,7 @@ partial class EditorForm
         _editMenu.Text = "Edit";
 
         // _viewMenu
-        _viewMenu.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { _viewHierarchyMenuItem, _viewInspectorMenuItem, _viewAssetBrowserMenuItem, _viewConsoleMenuItem });
+        _viewMenu.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { _viewHierarchyMenuItem, _viewInspectorMenuItem, _viewAssetBrowserMenuItem, _viewConsoleMenuItem, _viewMenuSeparator1, _resetLayoutMenuItem });
         _viewMenu.Name = "_viewMenu";
         _viewMenu.Size = new System.Drawing.Size(44, 20);
         _viewMenu.Text = "View";
@@ -202,6 +210,16 @@ partial class EditorForm
         _viewConsoleMenuItem.Text = "Console";
         _viewConsoleMenuItem.Click += OnViewMenuItemClick;
 
+        // _viewMenuSeparator1
+        _viewMenuSeparator1.Name = "_viewMenuSeparator1";
+        _viewMenuSeparator1.Size = new System.Drawing.Size(160, 6);
+
+        // _resetLayoutMenuItem
+        _resetLayoutMenuItem.Name = "_resetLayoutMenuItem";
+        _resetLayoutMenuItem.Size = new System.Drawing.Size(163, 22);
+        _resetLayoutMenuItem.Text = "Reset Layout";
+        _resetLayoutMenuItem.Click += OnResetLayoutClick;
+
         // _projectMenu
         _projectMenu.Name = "_projectMenu";
         _projectMenu.Size = new System.Drawing.Size(56, 20);
@@ -212,59 +230,15 @@ partial class EditorForm
         _debugMenu.Size = new System.Drawing.Size(54, 20);
         _debugMenu.Text = "Debug";
 
-        // _statusStrip
-        _statusStrip.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { _statusLabel });
-        _statusStrip.Location = new System.Drawing.Point(0, 778);
-        _statusStrip.Name = "_statusStrip";
-        _statusStrip.Size = new System.Drawing.Size(1280, 22);
-        _statusStrip.TabIndex = 2;
-
-        // _statusLabel
-        _statusLabel.Name = "_statusLabel";
-        _statusLabel.Size = new System.Drawing.Size(43, 17);
-        _statusLabel.Text = "Editing";
-
-        // _toolStrip
-        _toolStrip.AutoSize = false;
-        _toolStrip.Dock = DockStyle.Left;
-        _toolStrip.GripStyle = ToolStripGripStyle.Hidden;
-        _toolStrip.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { _playButton, _pauseButton, _stopButton, _toolStripSeparator1, _selectModeButton, _moveModeButton, _rotateModeButton, _scaleModeButton });
-        _toolStrip.LayoutStyle = ToolStripLayoutStyle.VerticalStackWithOverflow;
-        _toolStrip.Location = new System.Drawing.Point(0, 0);
-        _toolStrip.Name = "_toolStrip";
-        _toolStrip.Size = new System.Drawing.Size(90, 730);
-        _toolStrip.TabIndex = 0;
-        _toolStrip.Text = "_toolStrip";
-
-        // _playButton
-        _playButton.DisplayStyle = ToolStripItemDisplayStyle.Text;
-        _playButton.Name = "_playButton";
-        _playButton.Size = new System.Drawing.Size(88, 19);
-        _playButton.Text = "▶ Play";
-        _playButton.ToolTipText = "Play (F5)";
-        _playButton.Click += OnPlayClick;
-
-        // _pauseButton
-        _pauseButton.DisplayStyle = ToolStripItemDisplayStyle.Text;
-        _pauseButton.Enabled = false;
-        _pauseButton.Name = "_pauseButton";
-        _pauseButton.Size = new System.Drawing.Size(88, 19);
-        _pauseButton.Text = "⏸ Pause";
-        _pauseButton.ToolTipText = "Pause";
-        _pauseButton.Click += OnPauseClick;
-
-        // _stopButton
-        _stopButton.DisplayStyle = ToolStripItemDisplayStyle.Text;
-        _stopButton.Enabled = false;
-        _stopButton.Name = "_stopButton";
-        _stopButton.Size = new System.Drawing.Size(88, 19);
-        _stopButton.Text = "■ Stop";
-        _stopButton.ToolTipText = "Stop";
-        _stopButton.Click += OnStopClick;
-
-        // _toolStripSeparator1
-        _toolStripSeparator1.Name = "_toolStripSeparator1";
-        _toolStripSeparator1.Size = new System.Drawing.Size(88, 6);
+        // _gizmoStrip — horizontal, auto-sizes to button content
+        _gizmoStrip.AutoSize = true;
+        _gizmoStrip.GripStyle = ToolStripGripStyle.Hidden;
+        _gizmoStrip.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { _selectModeButton, _moveModeButton, _rotateModeButton, _scaleModeButton });
+        _gizmoStrip.LayoutStyle = ToolStripLayoutStyle.HorizontalStackWithOverflow;
+        _gizmoStrip.Location = new System.Drawing.Point(0, 0);
+        _gizmoStrip.Name = "_gizmoStrip";
+        _gizmoStrip.Size = new System.Drawing.Size(204, 25);
+        _gizmoStrip.TabIndex = 0;
 
         // _selectModeButton
         _selectModeButton.CheckOnClick = true;
@@ -272,7 +246,7 @@ partial class EditorForm
         _selectModeButton.CheckState = CheckState.Checked;
         _selectModeButton.DisplayStyle = ToolStripItemDisplayStyle.Text;
         _selectModeButton.Name = "_selectModeButton";
-        _selectModeButton.Size = new System.Drawing.Size(88, 19);
+        _selectModeButton.Size = new System.Drawing.Size(46, 22);
         _selectModeButton.Text = "Q Select";
         _selectModeButton.ToolTipText = "Select (Q)";
         _selectModeButton.Click += OnGizmoModeClick;
@@ -281,7 +255,7 @@ partial class EditorForm
         _moveModeButton.CheckOnClick = true;
         _moveModeButton.DisplayStyle = ToolStripItemDisplayStyle.Text;
         _moveModeButton.Name = "_moveModeButton";
-        _moveModeButton.Size = new System.Drawing.Size(88, 19);
+        _moveModeButton.Size = new System.Drawing.Size(43, 22);
         _moveModeButton.Text = "W Move";
         _moveModeButton.ToolTipText = "Move (W)";
         _moveModeButton.Click += OnGizmoModeClick;
@@ -290,7 +264,7 @@ partial class EditorForm
         _rotateModeButton.CheckOnClick = true;
         _rotateModeButton.DisplayStyle = ToolStripItemDisplayStyle.Text;
         _rotateModeButton.Name = "_rotateModeButton";
-        _rotateModeButton.Size = new System.Drawing.Size(88, 19);
+        _rotateModeButton.Size = new System.Drawing.Size(52, 22);
         _rotateModeButton.Text = "E Rotate";
         _rotateModeButton.ToolTipText = "Rotate (E)";
         _rotateModeButton.Click += OnGizmoModeClick;
@@ -299,61 +273,123 @@ partial class EditorForm
         _scaleModeButton.CheckOnClick = true;
         _scaleModeButton.DisplayStyle = ToolStripItemDisplayStyle.Text;
         _scaleModeButton.Name = "_scaleModeButton";
-        _scaleModeButton.Size = new System.Drawing.Size(88, 19);
+        _scaleModeButton.Size = new System.Drawing.Size(43, 22);
         _scaleModeButton.Text = "R Scale";
         _scaleModeButton.ToolTipText = "Scale (R)";
         _scaleModeButton.Click += OnGizmoModeClick;
+
+        // _playbackStrip — positioned at runtime in center of full toolbar width
+        _playbackStrip.AutoSize = true;
+        _playbackStrip.GripStyle = ToolStripGripStyle.Hidden;
+        _playbackStrip.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { _playButton, _pauseButton, _stopButton });
+        _playbackStrip.LayoutStyle = ToolStripLayoutStyle.HorizontalStackWithOverflow;
+        _playbackStrip.Location = new System.Drawing.Point(0, 0);
+        _playbackStrip.Name = "_playbackStrip";
+        _playbackStrip.Size = new System.Drawing.Size(116, 25);
+        _playbackStrip.TabIndex = 0;
+
+        // _playButton
+        _playButton.DisplayStyle = ToolStripItemDisplayStyle.Text;
+        _playButton.Name = "_playButton";
+        _playButton.Size = new System.Drawing.Size(36, 22);
+        _playButton.Text = "▶ Play";
+        _playButton.ToolTipText = "Play (F5)";
+        _playButton.Click += OnPlayClick;
+
+        // _pauseButton
+        _pauseButton.DisplayStyle = ToolStripItemDisplayStyle.Text;
+        _pauseButton.Enabled = false;
+        _pauseButton.Name = "_pauseButton";
+        _pauseButton.Size = new System.Drawing.Size(46, 22);
+        _pauseButton.Text = "⏸ Pause";
+        _pauseButton.ToolTipText = "Pause";
+        _pauseButton.Click += OnPauseClick;
+
+        // _stopButton
+        _stopButton.DisplayStyle = ToolStripItemDisplayStyle.Text;
+        _stopButton.Enabled = false;
+        _stopButton.Name = "_stopButton";
+        _stopButton.Size = new System.Drawing.Size(36, 22);
+        _stopButton.Text = "■ Stop";
+        _stopButton.ToolTipText = "Stop";
+        _stopButton.Click += OnStopClick;
+
+        // _playbackCell — fill cell in toolbar table, hosts centered playbackStrip
+        _playbackCell.Controls.Add(_playbackStrip);
+        _playbackCell.Dock = DockStyle.Fill;
+        _playbackCell.Location = new System.Drawing.Point(207, 0);
+        _playbackCell.Name = "_playbackCell";
+        _playbackCell.Size = new System.Drawing.Size(1073, 25);
+        _playbackCell.TabIndex = 1;
+
+        // _toolbarTable — Col 0: AutoSize (gizmo) | Col 1: Fill (playback center)
+        _toolbarTable.AutoSize = true;
+        _toolbarTable.ColumnCount = 2;
+        _toolbarTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.AutoSize));
+        _toolbarTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
+        _toolbarTable.Controls.Add(_gizmoStrip, 0, 0);
+        _toolbarTable.Controls.Add(_playbackCell, 1, 0);
+        _toolbarTable.Dock = DockStyle.Top;
+        _toolbarTable.Location = new System.Drawing.Point(0, 24);
+        _toolbarTable.Name = "_toolbarTable";
+        _toolbarTable.RowCount = 1;
+        _toolbarTable.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.AutoSize));
+        _toolbarTable.Size = new System.Drawing.Size(1280, 25);
+        _toolbarTable.TabIndex = 1;
+
+        // _statusStrip
+        _statusStrip.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { _statusLabel });
+        _statusStrip.Location = new System.Drawing.Point(0, 778);
+        _statusStrip.Name = "_statusStrip";
+        _statusStrip.Size = new System.Drawing.Size(1280, 22);
+        _statusStrip.TabIndex = 3;
+
+        // _statusLabel
+        _statusLabel.Name = "_statusLabel";
+        _statusLabel.Size = new System.Drawing.Size(43, 17);
+        _statusLabel.Text = "Editing";
 
         // _hierarchyPanel
         _hierarchyPanel.Dock = DockStyle.Fill;
         _hierarchyPanel.Location = new System.Drawing.Point(0, 0);
         _hierarchyPanel.Name = "_hierarchyPanel";
-        _hierarchyPanel.Size = new System.Drawing.Size(220, 554);
+        _hierarchyPanel.Size = new System.Drawing.Size(220, 527);
         _hierarchyPanel.TabIndex = 0;
 
         // _viewport
         _viewport.BackColor = System.Drawing.Color.FromArgb(30, 30, 30);
         _viewport.Dock = DockStyle.Fill;
-        _viewport.Location = new System.Drawing.Point(90, 0);
+        _viewport.Location = new System.Drawing.Point(0, 0);
         _viewport.Name = "_viewport";
-        _viewport.Size = new System.Drawing.Size(686, 554);
-        _viewport.TabIndex = 1;
-
-        // _viewportArea — toolstrip added first (Left), viewport added last (Fill)
-        _viewportArea.Controls.Add(_viewport);
-        _viewportArea.Controls.Add(_toolStrip);
-        _viewportArea.Dock = DockStyle.Fill;
-        _viewportArea.Location = new System.Drawing.Point(0, 0);
-        _viewportArea.Name = "_viewportArea";
-        _viewportArea.Size = new System.Drawing.Size(776, 554);
-        _viewportArea.TabIndex = 0;
+        _viewport.Size = new System.Drawing.Size(776, 527);
+        _viewport.TabIndex = 0;
 
         // _inspectorPanel
         _inspectorPanel.Dock = DockStyle.Fill;
         _inspectorPanel.Location = new System.Drawing.Point(0, 0);
         _inspectorPanel.Name = "_inspectorPanel";
-        _inspectorPanel.Size = new System.Drawing.Size(276, 554);
+        _inspectorPanel.Size = new System.Drawing.Size(276, 527);
         _inspectorPanel.TabIndex = 0;
 
-        // _innerSplit — Panel1: viewport area | Panel2: inspector
+        // _innerSplit
         _innerSplit.Dock = DockStyle.Fill;
         _innerSplit.Location = new System.Drawing.Point(0, 0);
         _innerSplit.Name = "_innerSplit";
         _innerSplit.Orientation = Orientation.Vertical;
-        _innerSplit.Panel1.Controls.Add(_viewportArea);
+        _innerSplit.Panel1.Controls.Add(_viewport);
         _innerSplit.Panel2.Controls.Add(_inspectorPanel);
-        _innerSplit.Size = new System.Drawing.Size(1056, 554);
+        _innerSplit.Size = new System.Drawing.Size(1056, 527);
         _innerSplit.SplitterDistance = 776;
         _innerSplit.TabIndex = 0;
 
-        // _outerSplit — Panel1: hierarchy | Panel2: innerSplit
+        // _outerSplit
         _outerSplit.Dock = DockStyle.Fill;
         _outerSplit.Location = new System.Drawing.Point(0, 0);
         _outerSplit.Name = "_outerSplit";
         _outerSplit.Orientation = Orientation.Vertical;
         _outerSplit.Panel1.Controls.Add(_hierarchyPanel);
         _outerSplit.Panel2.Controls.Add(_innerSplit);
-        _outerSplit.Size = new System.Drawing.Size(1280, 554);
+        _outerSplit.Size = new System.Drawing.Size(1280, 527);
         _outerSplit.SplitterDistance = 220;
         _outerSplit.TabIndex = 0;
 
@@ -399,16 +435,16 @@ partial class EditorForm
         _bottomTabControl.Size = new System.Drawing.Size(1280, 200);
         _bottomTabControl.TabIndex = 0;
 
-        // _mainSplit — Panel1: outerSplit (top) | Panel2: bottomTabControl (bottom)
+        // _mainSplit
         _mainSplit.Dock = DockStyle.Fill;
-        _mainSplit.Location = new System.Drawing.Point(0, 24);
+        _mainSplit.Location = new System.Drawing.Point(0, 49);
         _mainSplit.Name = "_mainSplit";
         _mainSplit.Orientation = Orientation.Horizontal;
         _mainSplit.Panel1.Controls.Add(_outerSplit);
         _mainSplit.Panel2.Controls.Add(_bottomTabControl);
-        _mainSplit.Size = new System.Drawing.Size(1280, 754);
-        _mainSplit.SplitterDistance = 554;
-        _mainSplit.TabIndex = 1;
+        _mainSplit.Size = new System.Drawing.Size(1280, 729);
+        _mainSplit.SplitterDistance = 527;
+        _mainSplit.TabIndex = 2;
 
         // EditorForm
         AutoScaleDimensions = new System.Drawing.SizeF(7f, 15f);
@@ -416,6 +452,7 @@ partial class EditorForm
         ClientSize = new System.Drawing.Size(1280, 800);
         Controls.Add(_mainSplit);
         Controls.Add(_statusStrip);
+        Controls.Add(_toolbarTable);
         Controls.Add(_mainMenuStrip);
         Font = new System.Drawing.Font("Segoe UI", 9f);
         MainMenuStrip = _mainMenuStrip;
@@ -424,6 +461,10 @@ partial class EditorForm
         Text = "MonoGame Editor";
         WindowState = FormWindowState.Maximized;
 
+        _toolbarTable.ResumeLayout(false);
+        _toolbarTable.PerformLayout();
+        _playbackCell.ResumeLayout(false);
+        _playbackCell.PerformLayout();
         _mainSplit.Panel1.ResumeLayout(false);
         _mainSplit.Panel2.ResumeLayout(false);
         ((System.ComponentModel.ISupportInitialize)_mainSplit).EndInit();
@@ -436,8 +477,6 @@ partial class EditorForm
         _innerSplit.Panel2.ResumeLayout(false);
         ((System.ComponentModel.ISupportInitialize)_innerSplit).EndInit();
         _innerSplit.ResumeLayout(false);
-        _viewportArea.ResumeLayout(false);
-        _viewportArea.PerformLayout();
         _assetsTab.ResumeLayout(false);
         _consoleTab.ResumeLayout(false);
         ResumeLayout(false);

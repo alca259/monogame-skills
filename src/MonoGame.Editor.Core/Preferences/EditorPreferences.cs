@@ -43,6 +43,9 @@ public sealed class EditorPreferences
     /// <summary>Absolute path of the last project opened, or empty if none.</summary>
     public string LastProjectPath { get; set; } = string.Empty;
 
+    /// <summary>Width of the folder tree inside the asset browser panel in pixels.</summary>
+    public int AssetBrowserSplitterDistance { get; set; } = 180;
+
     /// <summary>Serializes current preferences to disk.</summary>
     public void Save()
     {
@@ -74,6 +77,7 @@ public sealed class EditorPreferences
             AssetBrowserVisible = loaded.AssetBrowserVisible;
             ConsoleVisible = loaded.ConsoleVisible;
             LastProjectPath = loaded.LastProjectPath;
+            AssetBrowserSplitterDistance = loaded.AssetBrowserSplitterDistance;
         }
         catch (JsonException) { }
     }
