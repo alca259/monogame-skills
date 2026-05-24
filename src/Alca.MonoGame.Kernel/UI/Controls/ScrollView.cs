@@ -1,3 +1,5 @@
+using Alca.MonoGame.Kernel.Graphics;
+
 namespace Alca.MonoGame.Kernel.UI.Controls;
 
 /// <summary>
@@ -24,6 +26,15 @@ public sealed class ScrollView : UIContainer
     /// Children are measured against the fixed width; content taller/wider than this size becomes scrollable.
     /// </summary>
     public Vector2? FixedSize { get; set; }
+
+    /// <summary>1×1 white pixel texture used to draw background and border. Optional.</summary>
+    public Texture2D? Pixel { get; set; }
+
+    /// <summary>Background fill color. Transparent by default.</summary>
+    public Color BackColor { get; set; } = Color.Transparent;
+
+    /// <summary>Border color drawn around the viewport. Transparent by default.</summary>
+    public Color BorderColor { get; set; } = Color.Transparent;
 
     /// <summary>Creates a ScrollView bound to the given GraphicsDevice for scissor clipping.</summary>
     public ScrollView(GraphicsDevice graphicsDevice)
@@ -90,19 +101,25 @@ public sealed class ScrollView : UIContainer
 
     #region Update
 
+    /// <summary>Pixels scrolled per mouse-wheel notch (~120 raw units). Default 40.</summary>
+    public int ScrollSpeed { get; set; } = 40;
+
     /// <inheritdoc/>
     public override void Update(GameTime gameTime)
     {
         if (!IsEnabled) return;
 
-        int wheel = Mouse.GetState().ScrollWheelValue;
-
-        // We track delta scroll each frame via a cached field
-        int delta = _lastWheelValue - wheel;
+        MouseState ms = Mouse.GetState();
+        int wheel = ms.ScrollWheelValue;
+        int rawDelta = _lastWheelValue - wheel;
         _lastWheelValue = wheel;
 
-        if (delta != 0)
-            ScrollBy(new Vector2(0f, delta));
+        if (rawDelta != 0 && Bounds.Contains(ms.Position))
+        {
+            // rawDelta is ±120 per notch; convert to pixel distance using ScrollSpeed.
+            float sign = rawDelta > 0 ? 1f : -1f;
+            ScrollBy(new Vector2(0f, sign * ScrollSpeed));
+        }
 
         base.Update(gameTime);
     }
@@ -134,6 +151,17 @@ public sealed class ScrollView : UIContainer
     public override void Draw(SpriteBatch spriteBatch)
     {
         if (!IsVisible) return;
+
+        float opacity = EffectiveOpacity;
+
+        // Background and border drawn outside the scissor region (no clipping needed).
+        if (Pixel is not null)
+        {
+            if (BackColor.A > 0)
+                spriteBatch.Draw(Pixel, Bounds, BackColor * opacity);
+            if (BorderColor.A > 0)
+                DrawHelper.DrawBorder(Pixel, spriteBatch, Bounds, BorderColor * opacity, 1);
+        }
 
         // End current batch, switch to scissor, draw children, restore.
         spriteBatch.End();

@@ -1,6 +1,6 @@
 namespace Alca.MonoGame.Demo.Scenes;
 
-/// <summary>Scene 6/10 — demos ColorPickerRGB and ColorPickerHSV with a live color swatch.</summary>
+/// <summary>Scene 6/10 — demos the color picker with a live preview swatch.</summary>
 public sealed class UIScene_ColorPicker : Scene
 {
     private readonly UIRoot _uiRoot = new();
@@ -31,36 +31,22 @@ public sealed class UIScene_ColorPicker : Scene
         root.Add(new Label { Font = _font, Text = "Scene 6/10: Color Picker", Color = Color.DimGray });
         root.Add(new Label { Font = _font, Text = "Color Picker Demo", Color = Color.Yellow, HAlign = HAlign.Center });
 
-        var pickerRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 20 };
-
-        var rgbStack = new StackPanel { Orientation = Orientation.Vertical, Spacing = 6 };
-        rgbStack.Add(new Label { Font = _font, Text = "RGB" });
-        var rgbPicker = new ColorPickerRGB(_font, _pixel);
-        rgbPicker.ColorChanged += c => UpdateSwatch(c);
-        rgbStack.Add(rgbPicker);
-        pickerRow.Add(rgbStack);
-
-        var hsvStack = new StackPanel { Orientation = Orientation.Vertical, Spacing = 6 };
-        hsvStack.Add(new Label { Font = _font, Text = "HSV" });
-        var hsvPicker = new ColorPickerHSV(Core.GraphicsDevice, _font, _pixel);
-        hsvPicker.ColorChanged += c => UpdateSwatch(c);
-        hsvStack.Add(hsvPicker);
-        pickerRow.Add(hsvStack);
-
-        root.Add(pickerRow);
+        var picker = new ColorPickerRGB(Core.GraphicsDevice, _font, _pixel);
+        picker.ColorChanged += UpdateSwatch;
+        root.Add(picker);
 
         var swatchRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
 
         _swatchPanel = new Panel
         {
             BackgroundTexture = _pixel,
-            BackgroundColor = Color.White,
+            BackgroundColor = Color.Red,
             BorderColor = Color.Gray,
             BorderThickness = 1,
         };
         swatchRow.Add(_swatchPanel);
 
-        _hexLabel = new Label { Font = _font, Text = "#FFFFFF", Color = Color.LightGray };
+        _hexLabel = new Label { Font = _font, Text = "#FF0000", Color = Color.LightGray };
         swatchRow.Add(_hexLabel);
 
         root.Add(swatchRow);
