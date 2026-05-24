@@ -1,5 +1,3 @@
-using Alca.MonoGame.Demo.Scenes;
-
 namespace Alca.MonoGame.Demo.Scenes;
 
 /// <summary>
@@ -20,10 +18,9 @@ public sealed class EcsDemoScene : Scene
         catch { /* No font available */ }
     }
 
-    public override void Initialize()
+    protected override void PostInitialize()
     {
-        base.Initialize();
-
+        base.PostInitialize();
         _parentEntity = _world.CreateEntity("Parent", new Vector2(640, 360));
         _childEntity = _world.CreateEntity("Child", new Vector2(100, 0));
         _childEntity.SetParent(_parentEntity);
@@ -36,8 +33,8 @@ public sealed class EcsDemoScene : Scene
 
         _world.Update(gameTime);
 
-        if (Core.Input.Keyboard.IsKeyPressed(Microsoft.Xna.Framework.Input.Keys.Space))
-            Core.SceneManager.RequestChange(new UIDemoScene());
+        if (Core.Input.IsKeyReleased(Keys.Space))
+            Core.SceneManager.RequestChange(Core.GetService<UIDemoScene>());
     }
 
     public override void Draw(GameTime gameTime)

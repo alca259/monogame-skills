@@ -1,3 +1,4 @@
+global using Microsoft.Extensions.DependencyInjection;
 global using Microsoft.Xna.Framework;
 global using Microsoft.Xna.Framework.Audio;
 global using Microsoft.Xna.Framework.Content;

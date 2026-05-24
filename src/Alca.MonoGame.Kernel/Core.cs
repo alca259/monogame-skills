@@ -136,6 +136,11 @@ public abstract class Core : Game
         PostInitialize();
     }
 
+    /// <summary>Resolves a registered service from the DI container.</summary>
+    /// <typeparam name="T">The service type to resolve.</typeparam>
+    public static T GetService<T>() where T : notnull
+        => _instance._serviceProvider.GetRequiredService<T>();
+
     /// <summary>Override to register additional services into the DI container.
     /// Called during Initialize() after built-in kernel services are registered
     /// but before the container is built.</summary>

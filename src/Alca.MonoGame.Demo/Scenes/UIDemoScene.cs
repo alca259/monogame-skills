@@ -1,5 +1,3 @@
-using Alca.MonoGame.Demo.Scenes;
-
 namespace Alca.MonoGame.Demo.Scenes;
 
 /// <summary>
@@ -30,9 +28,8 @@ public sealed class UIDemoScene : Scene
     {
         _world.Update(gameTime);
 
-        // Press Space to switch to the ECS demo
-        if (Core.Input.Keyboard.IsKeyPressed(Microsoft.Xna.Framework.Input.Keys.Space))
-            Core.SceneManager.RequestChange(new EcsDemoScene());
+        if (Core.Input.IsKeyReleased(Keys.Space))
+            Core.SceneManager.RequestChange(Core.GetService<EcsDemoScene>());
     }
 
     public override void Draw(GameTime gameTime)

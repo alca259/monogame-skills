@@ -7,8 +7,14 @@ public sealed class DemoGame : Core
 {
     public DemoGame() : base("Alca MonoGame Demo", 1280, 720, false) { }
 
+    protected override void ConfigureServices(IServiceCollection services)
+    {
+        services.AddTransient<UIDemoScene>();
+        services.AddTransient<EcsDemoScene>();
+    }
+
     protected override void PostInitialize()
     {
-        Core.SceneManager.RequestChange(new UIDemoScene());
+        Core.SceneManager.RequestChange(Core.GetService<UIDemoScene>());
     }
 }
