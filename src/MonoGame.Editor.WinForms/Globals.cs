@@ -14,6 +14,7 @@ global using MonoGame.Editor.Core.Preferences;
 global using MonoGame.Editor.Core.Project;
 global using MonoGame.Editor.Core.Registry;
 global using MonoGame.Editor.Core.Serialization;
+global using MonoGame.Editor.Core.Tilemaps;
 global using MonoGame.Editor.WinForms.Controls;
 global using MonoGame.Editor.WinForms.Dialogs;
 global using MonoGame.Editor.WinForms.Gizmos;

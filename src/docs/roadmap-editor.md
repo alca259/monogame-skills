@@ -478,7 +478,7 @@ Browser de assets con drag & drop al viewport y al Inspector. Importación y rec
 
 ---
 
-## Fase 6 — Editor de Tilemaps
+## Fase 6 — Editor de Tilemaps ✅ COMPLETADA
 
 ### Objetivo
 Edición visual de tilemaps `.tmx` con palette de tiles, selección de capa y pintura directa en viewport.

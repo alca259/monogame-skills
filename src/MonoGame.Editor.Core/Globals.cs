@@ -10,3 +10,4 @@ global using MonoGame.Editor.Core.Preferences;
 global using MonoGame.Editor.Core.Project;
 global using MonoGame.Editor.Core.Registry;
 global using MonoGame.Editor.Core.Serialization;
+global using MonoGame.Editor.Core.Tilemaps;
