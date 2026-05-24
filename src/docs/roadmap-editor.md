@@ -41,6 +41,7 @@ MonoGame.Editor.sln
 - `EditorContext` es la fuente de verdad única del estado del editor en tiempo de ejecución
 - Los `.json` de escena son la fuente de verdad para edición, legibles y versionables con git
 - Toda la aplicación del editor debe ser async/await en la medida de lo posible.
+- En este proyecto de Editor, **NO SE DEBE HACER NINGÚN TEST UNITARIO**.
 
 ---
 
