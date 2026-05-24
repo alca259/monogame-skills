@@ -43,4 +43,19 @@ public static class DrawHelper
         sb.DrawString(font, text, pos + new Vector2(1, 1), Color.Black, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
         sb.DrawString(font, text, pos, color, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
     }
+
+    private static Texture2D? _defaultPixelTexture;
+    /// <summary>Gets a default 1x1 white pixel texture for drawing primitives.</summary>
+    public static Texture2D DefaultPixelTexture
+    {
+        get
+        {
+            if (_defaultPixelTexture == null)
+            {
+                _defaultPixelTexture = new Texture2D(Core.GraphicsDevice, 1, 1);
+                _defaultPixelTexture.SetData([Color.White]);
+            }
+            return _defaultPixelTexture;
+        }
+    }
 }

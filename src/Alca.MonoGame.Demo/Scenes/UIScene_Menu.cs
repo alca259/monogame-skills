@@ -19,28 +19,45 @@ public sealed class UIScene_Menu : Scene
 
     private void BuildUI()
     {
-        var root = new StackPanel { Orientation = Orientation.Vertical, Spacing = 8 };
+        _uiRoot.Add(new Label
+        {
+            Font = _font,
+            Text = "MonoGame UI Demo — Selecciona una escena",
+            Color = Color.Yellow,
+            HAlign = HAlign.Center,
+        });
 
-        root.Add(new Label { Font = _font, Text = "MonoGame UI Demo — Selecciona una escena", Color = Color.Yellow, HAlign = HAlign.Center });
+        var buttonList = new StackPanel { Orientation = Orientation.Vertical, Spacing = 8 };
 
-        AddEntry(root, "1.  Basic Controls    (Button, Label, Checkbox, Panel)", () => Core.SceneManager.RequestChange(Core.GetService<UIScene_BasicControls>()));
-        AddEntry(root, "2.  Input Text        (TextBox, NumericBox, PasswordBox)", () => Core.SceneManager.RequestChange(Core.GetService<UIScene_InputText>()));
-        AddEntry(root, "3.  TextArea", () => Core.SceneManager.RequestChange(Core.GetService<UIScene_TextArea>()));
-        AddEntry(root, "4.  Sliders & Progress Bars", () => Core.SceneManager.RequestChange(Core.GetService<UIScene_Sliders>()));
-        AddEntry(root, "5.  Selection         (Dropdown, RadioButton)", () => Core.SceneManager.RequestChange(Core.GetService<UIScene_Selection>()));
-        AddEntry(root, "6.  Color Picker      (RGB + HSV)", () => Core.SceneManager.RequestChange(Core.GetService<UIScene_ColorPicker>()));
-        AddEntry(root, "7.  Layout            (StackPanel, Flow, Grid, Anchor, Canvas)", () => Core.SceneManager.RequestChange(Core.GetService<UIScene_Layout>()));
-        AddEntry(root, "8.  ScrollView", () => Core.SceneManager.RequestChange(Core.GetService<UIScene_ScrollView>()));
-        AddEntry(root, "9.  Tooltip", () => Core.SceneManager.RequestChange(Core.GetService<UIScene_Tooltip>()));
-        AddEntry(root, "10. Focus Manager     (Tab navigation)", () => Core.SceneManager.RequestChange(Core.GetService<UIScene_Focus>()));
-        AddEntry(root, "—   ECS Hierarchy Demo", () => Core.SceneManager.RequestChange(Core.GetService<EcsDemoScene>()));
+        AddEntry(buttonList, "01. Basic Controls (Button, Label, Checkbox, Panel)", () => Core.SceneManager.RequestChange(Core.GetService<UIScene_BasicControls>()));
+        AddEntry(buttonList, "02. Input Text (TextBox, NumericBox, PasswordBox)", () => Core.SceneManager.RequestChange(Core.GetService<UIScene_InputText>()));
+        AddEntry(buttonList, "03. TextArea", () => Core.SceneManager.RequestChange(Core.GetService<UIScene_TextArea>()));
+        AddEntry(buttonList, "04. Sliders & Progress Bars", () => Core.SceneManager.RequestChange(Core.GetService<UIScene_Sliders>()));
+        AddEntry(buttonList, "05. Selection (Dropdown, RadioButton)", () => Core.SceneManager.RequestChange(Core.GetService<UIScene_Selection>()));
+        AddEntry(buttonList, "06. Color Picker (RGB + HSV)", () => Core.SceneManager.RequestChange(Core.GetService<UIScene_ColorPicker>()));
+        AddEntry(buttonList, "07. Layout (StackPanel, Flow, Grid, Anchor, Canvas)", () => Core.SceneManager.RequestChange(Core.GetService<UIScene_Layout>()));
+        AddEntry(buttonList, "08. ScrollView", () => Core.SceneManager.RequestChange(Core.GetService<UIScene_ScrollView>()));
+        AddEntry(buttonList, "09. Tooltip", () => Core.SceneManager.RequestChange(Core.GetService<UIScene_Tooltip>()));
+        AddEntry(buttonList, "10. Focus Manager (Tab navigation)", () => Core.SceneManager.RequestChange(Core.GetService<UIScene_Focus>()));
+        AddEntry(buttonList, "11. ECS Hierarchy Demo", () => Core.SceneManager.RequestChange(Core.GetService<EcsDemoScene>()));
 
-        _uiRoot.Add(root);
+        var scrollView = new ScrollView(Core.GraphicsDevice) { FixedSize = new Vector2(700, 340) };
+        scrollView.Add(buttonList);
+
+        var anchor = new AnchorLayout();
+        anchor.SetAnchor(scrollView, Anchor.TopCenter, new Vector2(0, 40));
+        _uiRoot.Add(anchor);
     }
 
     private void AddEntry(StackPanel parent, string text, Action onClick)
     {
-        var btn = new Button(_font, text);
+        var btn = new Button(_font, text)
+        {
+            BackgroundPixel = _pixel,
+            NormalColor = Color.White,
+            HoveredColor = Color.LightGray,
+            HAlign = HAlign.Left,
+        };
         btn.Clicked += onClick;
         parent.Add(btn);
     }

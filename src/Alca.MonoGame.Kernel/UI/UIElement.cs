@@ -3,6 +3,9 @@ namespace Alca.MonoGame.Kernel.UI;
 /// <summary>Base class for all UI elements in the visual tree.</summary>
 public abstract class UIElement
 {
+    /// <summary>Unique identifier for this element.</summary>
+    public Guid Id { get; } = Guid.NewGuid();
+
     /// <summary>True when the element needs a new layout pass; reset by Arrange.</summary>
     public bool IsLayoutDirty { get; private set; } = true;
 

@@ -1,3 +1,4 @@
+using Alca.MonoGame.Kernel.Graphics;
 using Alca.MonoGame.Kernel.UI.Focus;
 using Alca.MonoGame.Kernel.UI.Interaction;
 
@@ -12,8 +13,8 @@ public sealed class Button : UIElement, IUIInteractable, IFocusable
     private const float ScaleHovered = 1.05f;
     private const float ScalePressed = 0.97f;
     private const float ScaleLerpSpeed = 12f;
-    private const int PaddingH = 16;
-    private const int PaddingV = 10;
+    private const int PaddingH = 8;
+    private const int PaddingV = 4;
 
     private const int StateNormal = 0;
     private const int StateHovered = 1;
@@ -29,6 +30,9 @@ public sealed class Button : UIElement, IUIInteractable, IFocusable
 
     /// <summary>Pre-allocated color array indexed by button state (Normal=0, Hovered=1, Pressed=2).</summary>
     private readonly Color[] _stateColors = new Color[3];
+
+    /// <summary>Pre-allocated text color array indexed by button state (Normal=0, Hovered=1, Pressed=2).</summary>
+    private readonly Color[] _textColors = new Color[3];
 
     private float _currentScale = ScaleNormal;
     private float _targetScale = ScaleNormal;
@@ -65,7 +69,45 @@ public sealed class Button : UIElement, IUIInteractable, IFocusable
     /// <summary>Color used when the button is disabled.</summary>
     public Color DisabledColor { get; set; } = Color.Gray;
 
-    /// <summary>Optional background texture. When null, the button renders as a colored rectangle.</summary>
+    /// <summary>Text color used when the button is in its normal state.</summary>
+    public Color NormalTextColor
+    {
+        get => _textColors[StateNormal];
+        set => _textColors[StateNormal] = value;
+    }
+
+    /// <summary>Text color used when the pointer is over the button.</summary>
+    public Color HoveredTextColor
+    {
+        get => _textColors[StateHovered];
+        set => _textColors[StateHovered] = value;
+    }
+
+    /// <summary>Text color used when the button is being pressed.</summary>
+    public Color PressedTextColor
+    {
+        get => _textColors[StatePressed];
+        set => _textColors[StatePressed] = value;
+    }
+
+    /// <summary>Text color used when the button is disabled.</summary>
+    public Color DisabledTextColor { get; set; } = Color.DarkGray;
+
+    /// <summary>
+    /// Fixed size override. When set, <see cref="Measure"/> returns this value instead of computing from text + padding.
+    /// </summary>
+    public Vector2? FixedSize { get; set; }
+
+    /// <summary>Horizontal alignment of the label text within the button bounds.</summary>
+    public HAlign HAlign { get; set; } = HAlign.Center;
+
+    /// <summary>
+    /// A 1×1 white pixel texture used to fill the button background with the active state color.
+    /// When set, the background is drawn even if <see cref="Texture"/> is null.
+    /// </summary>
+    public Texture2D? BackgroundPixel { get; set; }
+
+    /// <summary>Optional sprite texture drawn on top of the background. When null, only the solid background is used.</summary>
     public Texture2D? Texture { get; set; }
 
     /// <summary>Fired when the button is clicked (pointer up while hovered).</summary>
@@ -78,7 +120,8 @@ public sealed class Button : UIElement, IUIInteractable, IFocusable
     /// <summary>Creates a new Button.</summary>
     /// <param name="font">Font for the label text. Can be null for an icon-only button.</param>
     /// <param name="text">Label text.</param>
-    public Button(SpriteFont? font, string text)
+    /// <param name="backgroundTexture">Optional background texture for the button. If null, a default pixel texture is used.</param>
+    public Button(SpriteFont? font, string text, Texture2D? backgroundTexture = null)
     {
         _font = font;
         _text = text;
@@ -87,6 +130,12 @@ public sealed class Button : UIElement, IUIInteractable, IFocusable
         _stateColors[StateNormal] = Color.White;
         _stateColors[StateHovered] = Color.LightYellow;
         _stateColors[StatePressed] = new Color(180, 180, 180);
+
+        _textColors[StateNormal] = Color.Black;
+        _textColors[StateHovered] = Color.Black;
+        _textColors[StatePressed] = Color.Black;
+
+        BackgroundPixel = backgroundTexture ?? DrawHelper.DefaultPixelTexture;
     }
 
     #endregion
@@ -96,7 +145,7 @@ public sealed class Button : UIElement, IUIInteractable, IFocusable
     /// <inheritdoc/>
     public override void Measure(Vector2 availableSize)
     {
-        DesiredSize = new Vector2(_textSize.X + PaddingH, _textSize.Y + PaddingV);
+        DesiredSize = FixedSize ?? new Vector2(_textSize.X + PaddingH, _textSize.Y + PaddingV);
     }
 
     #endregion
@@ -129,6 +178,12 @@ public sealed class Button : UIElement, IUIInteractable, IFocusable
 
         Vector2 center = Bounds.Center.ToVector2();
 
+        if (BackgroundPixel is not null)
+        {
+            Vector2 bgScale = new Vector2(Bounds.Width * _currentScale, Bounds.Height * _currentScale);
+            spriteBatch.Draw(BackgroundPixel, center, null, tint, 0f, new Vector2(0.5f, 0.5f), bgScale, SpriteEffects.None, 0f);
+        }
+
         if (Texture is not null)
         {
             Vector2 origin = new Vector2(Texture.Width / 2f, Texture.Height / 2f);
@@ -137,11 +192,23 @@ public sealed class Button : UIElement, IUIInteractable, IFocusable
 
         if (_font is not null && _text.Length > 0)
         {
-            Vector2 halfText = _textSize / 2f;
-            spriteBatch.DrawString(_font, _text,
-                center - halfText * _currentScale,
-                Color.Black * EffectiveOpacity,
-                0f, Vector2.Zero, _currentScale, SpriteEffects.None, 0f);
+            Color textColor = !IsEnabled ? DisabledTextColor : _textColors[_state];
+            float textX = HAlign switch
+            {
+                HAlign.Left  => Bounds.X + PaddingH / 2f,
+                HAlign.Right => Bounds.Right - _textSize.X * _currentScale - PaddingH / 2f,
+                _            => center.X - _textSize.X / 2f * _currentScale,
+            };
+            spriteBatch.DrawString(
+                spriteFont: _font,
+                text: _text,
+                position: new Vector2(textX, center.Y - _textSize.Y / 2f * _currentScale),
+                color: textColor * EffectiveOpacity,
+                rotation: 0f,
+                origin: Vector2.Zero,
+                scale: _currentScale,
+                effects: SpriteEffects.None,
+                layerDepth: 0f);
         }
     }
 

@@ -16,6 +16,10 @@ public class UIContainer : UIElement
             previous.Remove(child);
 
         child.Parent = this;
+
+        if (Children.Exists(c => c.Id == child.Id))
+            return;
+
         Children.Add(child);
         Invalidate();
         OnChildAdded(child);

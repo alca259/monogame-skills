@@ -19,6 +19,12 @@ public sealed class ScrollView : UIContainer
     /// <summary>Current scroll position in pixels (X, Y), clamped to valid range.</summary>
     public Vector2 ScrollOffset => _scrollOffset;
 
+    /// <summary>
+    /// When set, Measure returns this size so the scroll view acts as a fixed-size clipped viewport.
+    /// Children are measured against the fixed width; content taller/wider than this size becomes scrollable.
+    /// </summary>
+    public Vector2? FixedSize { get; set; }
+
     /// <summary>Creates a ScrollView bound to the given GraphicsDevice for scissor clipping.</summary>
     public ScrollView(GraphicsDevice graphicsDevice)
     {
@@ -29,23 +35,54 @@ public sealed class ScrollView : UIContainer
     #region Layout
 
     /// <inheritdoc/>
+    public override void Measure(Vector2 availableSize)
+    {
+        Vector2 contentAvail = FixedSize.HasValue
+            ? new Vector2(FixedSize.Value.X, float.MaxValue)
+            : availableSize;
+
+        for (int i = 0; i < Children.Count; i++)
+            Children[i].Measure(contentAvail);
+
+        if (FixedSize.HasValue)
+        {
+            DesiredSize = FixedSize.Value;
+            return;
+        }
+
+        float maxW = 0f, totalH = 0f;
+        for (int i = 0; i < Children.Count; i++)
+        {
+            Vector2 ds = Children[i].DesiredSize;
+            if (ds.X > maxW) maxW = ds.X;
+            totalH += ds.Y;
+        }
+        DesiredSize = new Vector2(maxW, totalH);
+    }
+
+    /// <inheritdoc/>
     public override void Arrange(Rectangle finalBounds)
     {
         Bounds = finalBounds;
 
-        // Stack children vertically, shifted by scroll offset
         int cursor = finalBounds.Y - (int)_scrollOffset.Y;
+        float contentWidth = 0f;
 
         for (int i = 0; i < ChildrenReadOnly.Count; i++)
         {
             Vector2 ds = ChildrenReadOnly[i].DesiredSize;
             int childH = (int)ds.Y;
-            ChildrenReadOnly[i].Arrange(new Rectangle(finalBounds.X, cursor, finalBounds.Width, childH));
+            // Give children their natural width when wider than the viewport (enables H scroll)
+            int childW = Math.Max((int)ds.X, finalBounds.Width);
+            if (ds.X > contentWidth) contentWidth = ds.X;
+
+            ChildrenReadOnly[i].Arrange(new Rectangle(
+                finalBounds.X - (int)_scrollOffset.X, cursor, childW, childH));
             cursor += childH;
         }
 
         float contentHeight = cursor - (finalBounds.Y - (int)_scrollOffset.Y);
-        ContentSize = new Vector2(finalBounds.Width, contentHeight);
+        ContentSize = new Vector2(MathF.Max(contentWidth, finalBounds.Width), contentHeight);
         ClampScrollOffset();
     }
 

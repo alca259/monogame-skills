@@ -16,6 +16,7 @@ public sealed class AnchorLayout : UIContainer
     /// <param name="offset">Additional pixel offset applied after anchor resolution.</param>
     public void SetAnchor(UIElement child, Anchor anchor, Vector2 offset = default)
     {
+        Add(child);
         _anchors[child] = new AnchorEntry(anchor, offset);
         Invalidate();
     }
