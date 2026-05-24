@@ -23,6 +23,15 @@ public sealed class ColorPickerHSV : UIContainer
     private Texture2D? _hueBarTexture;
     private Texture2D? _svSquareTexture;
 
+    // Pre-allocated pixel data arrays — reused across frames to avoid GC pressure.
+    private Color[]? _hueBarData;
+    private Color[]? _svData;
+
+    // Last state used to generate each texture; skip regeneration when unchanged.
+    private Rectangle _lastHueBarBounds;
+    private Rectangle _lastSvBounds;
+    private float _lastSvHue = -1f;
+
     private float _hue;
     private float _saturation = 1f;
     private float _brightness = 1f;
@@ -127,44 +136,58 @@ public sealed class ColorPickerHSV : UIContainer
     private void GenerateHueBarTexture()
     {
         if (_graphicsDevice is null || _hueBarBounds.Width <= 0 || _hueBarBounds.Height <= 0) return;
+        if (_hueBarTexture is not null && _lastHueBarBounds == _hueBarBounds) return;
 
-        _hueBarTexture?.Dispose();
         int w = _hueBarBounds.Width;
         int h = _hueBarBounds.Height;
-        _hueBarTexture = new Texture2D(_graphicsDevice, w, h);
+        if (_hueBarTexture is null || _hueBarTexture.Width != w || _hueBarTexture.Height != h)
+        {
+            _hueBarTexture?.Dispose();
+            _hueBarTexture = new Texture2D(_graphicsDevice, w, h);
+            _hueBarData = new Color[w * h];
+        }
 
-        Color[] data = new Color[w * h];
         for (int col = 0; col < w; col++)
         {
             Color c = ColorPickerUtils.HsvToRgb(col / (float)w * 360f, 1f, 1f);
             for (int row = 0; row < h; row++)
-                data[row * w + col] = c;
+                _hueBarData![row * w + col] = c;
         }
 
-        _hueBarTexture.SetData(data);
+        _hueBarTexture.SetData(_hueBarData);
+        _lastHueBarBounds = _hueBarBounds;
     }
 
     private void RegenerateSvTexture()
     {
         if (_graphicsDevice is null || _svSquareBounds.Width <= 0 || _svSquareBounds.Height <= 0) return;
 
-        _svSquareTexture?.Dispose();
         int w = _svSquareBounds.Width;
         int h = _svSquareBounds.Height;
-        _svSquareTexture = new Texture2D(_graphicsDevice, w, h);
+        bool sizeChanged = _svSquareTexture is null || _svSquareTexture.Width != w || _svSquareTexture.Height != h;
+        bool contentChanged = _lastSvHue < 0f || _hue != _lastSvHue || _lastSvBounds != _svSquareBounds;
+        if (!sizeChanged && !contentChanged) return;
 
-        Color[] data = new Color[w * h];
+        if (sizeChanged)
+        {
+            _svSquareTexture?.Dispose();
+            _svSquareTexture = new Texture2D(_graphicsDevice, w, h);
+            _svData = new Color[w * h];
+        }
+
         for (int row = 0; row < h; row++)
         {
             float v = 1f - row / (float)(h - 1);
             for (int col = 0; col < w; col++)
             {
                 float s = col / (float)(w - 1);
-                data[row * w + col] = ColorPickerUtils.HsvToRgb(_hue, s, v);
+                _svData![row * w + col] = ColorPickerUtils.HsvToRgb(_hue, s, v);
             }
         }
 
-        _svSquareTexture.SetData(data);
+        _svSquareTexture!.SetData(_svData);
+        _lastSvHue = _hue;
+        _lastSvBounds = _svSquareBounds;
     }
 
     #endregion
