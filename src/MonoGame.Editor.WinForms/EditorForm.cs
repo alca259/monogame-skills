@@ -3,8 +3,11 @@ namespace MonoGame.Editor.WinForms;
 /// <summary>Main editor window. Logic and event wiring.</summary>
 public sealed partial class EditorForm : Form
 {
-    private readonly EditorContext _context;
-    private readonly EditorPreferences _preferences;
+    private readonly EditorContext _context = null!;
+    private readonly EditorPreferences _preferences = null!;
+
+    /// <summary>Designer-only constructor.</summary>
+    public EditorForm() => InitializeComponent();
 
     public EditorForm(EditorContext context)
     {
@@ -20,22 +23,18 @@ public sealed partial class EditorForm : Form
 
     private void ApplyPreferences()
     {
-        // Apply min-size constraints now that controls have real dimensions.
-        _innerSplit.Panel2MinSize = 220;
         _outerSplit.Panel1MinSize = 180;
+        _innerSplit.Panel2MinSize = 220;
         _mainSplit.Panel2MinSize  = 80;
 
-        // Outer split: left panel width — default 220 px
         int leftWidth = _preferences.LeftPanelWidth > 0 ? _preferences.LeftPanelWidth : 220;
         _outerSplit.SplitterDistance = ClampSplitter(leftWidth, 180, _outerSplit.Width - 180);
 
-        // Inner split: right panel width — default 280 px
         int rightWidth = _preferences.RightPanelWidth > 0 ? _preferences.RightPanelWidth : 280;
         _innerSplit.SplitterDistance = ClampSplitter(_innerSplit.Width - rightWidth, 320, _innerSplit.Width - 220);
 
-        // Main split: console height — default 160 px
-        int consoleH = _preferences.ConsolePanelHeight > 0 ? _preferences.ConsolePanelHeight : 160;
-        _mainSplit.SplitterDistance = ClampSplitter(_mainSplit.Height - consoleH, 240, _mainSplit.Height - 80);
+        int bottomH = _preferences.ConsolePanelHeight > 0 ? _preferences.ConsolePanelHeight : 200;
+        _mainSplit.SplitterDistance = ClampSplitter(_mainSplit.Height - bottomH, 240, _mainSplit.Height - 80);
 
         _viewHierarchyMenuItem.Checked    = _preferences.HierarchyVisible;
         _viewInspectorMenuItem.Checked    = _preferences.InspectorVisible;
@@ -52,20 +51,19 @@ public sealed partial class EditorForm : Form
     {
         Shown += (_, _) => ApplyPreferences();
         _context.EventBus.Subscribe<EditorStateChangedEvent>(OnEditorStateChanged);
-
         FormClosing += (_, _) => SavePreferences();
         _viewport.RenderFrame += OnViewportRenderFrame;
     }
 
     private void SavePreferences()
     {
-        _preferences.LeftPanelWidth = _outerSplit.SplitterDistance;
-        _preferences.RightPanelWidth = _innerSplit.Width - _innerSplit.SplitterDistance;
-        _preferences.ConsolePanelHeight = _mainSplit.Height - _mainSplit.SplitterDistance;
-        _preferences.HierarchyVisible = _viewHierarchyMenuItem.Checked;
-        _preferences.InspectorVisible = _viewInspectorMenuItem.Checked;
+        _preferences.LeftPanelWidth      = _outerSplit.SplitterDistance;
+        _preferences.RightPanelWidth     = _innerSplit.Width - _innerSplit.SplitterDistance;
+        _preferences.ConsolePanelHeight  = _mainSplit.Height - _mainSplit.SplitterDistance;
+        _preferences.HierarchyVisible    = _viewHierarchyMenuItem.Checked;
+        _preferences.InspectorVisible    = _viewInspectorMenuItem.Checked;
         _preferences.AssetBrowserVisible = _viewAssetBrowserMenuItem.Checked;
-        _preferences.ConsoleVisible = _viewConsoleMenuItem.Checked;
+        _preferences.ConsoleVisible      = _viewConsoleMenuItem.Checked;
         _preferences.Save();
     }
 
@@ -121,8 +119,8 @@ public sealed partial class EditorForm : Form
         System.Drawing.Color accent = System.Drawing.Color.FromArgb(0, 122, 204);
         System.Drawing.Color normal = System.Drawing.SystemColors.Control;
 
-        _playButton.BackColor  = state == EditorState.Playing  ? accent : normal;
-        _pauseButton.BackColor = state == EditorState.Paused   ? accent : normal;
+        _playButton.BackColor  = state == EditorState.Playing ? accent : normal;
+        _pauseButton.BackColor = state == EditorState.Paused  ? accent : normal;
         _stopButton.BackColor  = normal;
 
         _playButton.Enabled  = state != EditorState.Playing;
@@ -146,17 +144,17 @@ public sealed partial class EditorForm : Form
 
     private void UpdatePanelVisibility()
     {
-        _leftTabControl.TabPages.Clear();
-
-        if (_viewHierarchyMenuItem.Checked)
-            _leftTabControl.TabPages.Add(_hierarchyTab);
-
-        if (_viewAssetBrowserMenuItem.Checked)
-            _leftTabControl.TabPages.Add(_assetBrowserTab);
-
-        _outerSplit.Panel1Collapsed = _leftTabControl.TabPages.Count == 0;
+        _outerSplit.Panel1Collapsed = !_viewHierarchyMenuItem.Checked;
         _innerSplit.Panel2Collapsed = !_viewInspectorMenuItem.Checked;
-        _mainSplit.Panel2Collapsed  = !_viewConsoleMenuItem.Checked;
+
+        bool assetsVisible  = _viewAssetBrowserMenuItem.Checked;
+        bool consoleVisible = _viewConsoleMenuItem.Checked;
+
+        _bottomTabControl.TabPages.Clear();
+        if (assetsVisible)  _bottomTabControl.TabPages.Add(_assetsTab);
+        if (consoleVisible) _bottomTabControl.TabPages.Add(_consoleTab);
+
+        _mainSplit.Panel2Collapsed = !assetsVisible && !consoleVisible;
     }
 
     private void OnViewMenuItemClick(object? sender, EventArgs e) => UpdatePanelVisibility();
