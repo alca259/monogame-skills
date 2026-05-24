@@ -4,6 +4,7 @@
 **Objetivo**: Editor de juegos 2D estilo Unity, integrado con Visual Studio, con viewport MonoGame embebido, jerarquía ECS, gizmos de transform, editores especializados y pipeline de build.
 **Reglas transversales a todos los desarrollos:**
 - Al terminar, actualizar este fichero marcando los TODOs completados.
+- Dentro de la carpeta src/murder-main-reference/Readme.md hay un editor de referencia basado en Monogame FNA que puede usarse como base.
 
 ---
 
