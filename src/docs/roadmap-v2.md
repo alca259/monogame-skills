@@ -378,22 +378,6 @@ Ideas para roadmaps futuros (sin especificación todavía):
 - **10.x — Extended Audio:** Spatial audio, audio zones, mixer
 - **10.x — Networking:** P2P o cliente/servidor básico para juegos multijugador pequeños
 
----
-
-## Proyecto Demo
-
-> **Objetivo:** Proyecto MonoGame ejecutable para probar visualmente los sistemas de la librería.
-
-**`src/Alca.MonoGame.Demo/`** — proyecto ejecutable (`OutputType=WinExe`)
-- `DemoGame.cs` — `sealed class DemoGame : Core`
-- `Scenes/UIDemoScene.cs` — demo del sistema UI (requiere `Content/DefaultFont.spritefont`)
-- `Scenes/EcsDemoScene.cs` — demo de jerarquía ECS con `TransformBehaviour` padre/hijo
-- Añadir escenas nuevas conforme se completen nuevas fases
-
-**Para añadir fuentes al demo:**
-1. Crear `Content/DefaultFont.spritefont` con un SpriteFont de MonoGame Content Builder
-2. Compilar el `.xnb` con MGCB y copiar a `Content/`
-3. Ejecutar el proyecto para ver las escenas renderizadas
 
 ---
 
@@ -426,14 +410,7 @@ src/Alca.MonoGame.Kernel/
 │   └── SpringJoint2D.cs
 └── ...
 
-src/Alca.MonoGame.Demo/
-├── Scenes/
-│   ├── EcsDemoScene.cs
-│   └── UIDemoScene.cs
-├── DemoGame.cs
-├── Globals.cs
-├── Program.cs
-└── Alca.MonoGame.Demo.csproj
+
 ```
 
 ---
@@ -442,7 +419,6 @@ src/Alca.MonoGame.Demo/
 
 - **Fase 7:** `dotnet test` — todos los tests anteriores siguen pasando (backward compat). Test de jerarquía: `child.SetParent(parent)` → `child.Transform.Position == parent.Transform.Position + child.Transform.LocalPosition`. Test Entity no-null: `new MyBehaviour().Entity` lanza `InvalidOperationException`.
 - **Fase 8:** Crear una `Physics2DWorld`, añadir un `RigidBody2D` con `GravityScale=1` a una entidad, llamar `Step()` en 60 fps durante 1 segundo — la entidad debe caer ~4.9 unidades en Y.
-- **Demo:** Arrancar `Alca.MonoGame.Demo`, ver `UIDemoScene` y `EcsDemoScene` (con fuente cargada). El hijo orbita alrededor del padre en `EcsDemoScene`.
 
 ---
 
@@ -456,8 +432,6 @@ src/
 │   └── Alca.MonoGame.Kernel.csproj
 ├── Alca.MonoGame.Kernel.UnitTests/        ← tests xUnit
 │   └── Alca.MonoGame.Kernel.UnitTests.csproj
-└── Alca.MonoGame.Demo/                    ← demo ejecutable (nuevo)
-    └── Alca.MonoGame.Demo.csproj
 ```
 
 ### Dependencias NuGet (Kernel)
