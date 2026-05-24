@@ -1,0 +1,9 @@
+global using Microsoft.Xna.Framework;
+global using Microsoft.Xna.Framework.Graphics;
+global using MonoGame.Editor.Core;
+global using MonoGame.Editor.Core.Events;
+global using MonoGame.Editor.Core.Models;
+global using MonoGame.Editor.Core.Preferences;
+global using MonoGame.Editor.Core.Project;
+global using MonoGame.Editor.WinForms.Controls;
+global using MonoGame.Editor.WinForms.Panels;

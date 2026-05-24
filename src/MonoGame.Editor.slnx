@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="MonoGame.Editor.Core/MonoGame.Editor.Core.csproj" />
+  <Project Path="MonoGame.Editor.Core.UnitTests/MonoGame.Editor.Core.UnitTests.csproj" />
+  <Project Path="MonoGame.Editor.WinForms/MonoGame.Editor.WinForms.csproj" />
+</Solution>
