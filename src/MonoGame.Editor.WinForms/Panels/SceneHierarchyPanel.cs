@@ -219,7 +219,17 @@ public sealed class SceneHierarchyPanel : UserControl
 
     private void OnNodeMouseClick(object? sender, TreeNodeMouseClickEventArgs e)
     {
-        if (_suppressSelectionEvent || e.Button != MouseButtons.Left) return;
+        if (_suppressSelectionEvent) return;
+
+        if (e.Button == MouseButtons.Right)
+        {
+            // WinForms TreeView does NOT auto-select on right-click, so we do it manually.
+            // Setting SelectedNode fires AfterSelect which updates _context selection.
+            _tree.SelectedNode = e.Node;
+            return;
+        }
+
+        if (e.Button != MouseButtons.Left) return;
         if (e.Node?.Tag is not EditorGameObject obj) return;
 
         if ((ModifierKeys & Keys.Control) != 0)

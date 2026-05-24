@@ -9,6 +9,8 @@ public sealed partial class EditorForm : Form
     private readonly GizmoController _gizmoCtrl = new();
     private GizmoRenderer? _gizmoRenderer;
     private readonly ContentWatcher _contentWatcher = null!;
+    private ToolStripMenuItem _saveProjectMenuItem = null!;
+    private ToolStripMenuItem _openRecentMenuItem = null!;
 
     /// <summary>Designer-only constructor.</summary>
     public EditorForm() => InitializeComponent();
@@ -90,7 +92,8 @@ public sealed partial class EditorForm : Form
         _inspectorPanel.Initialize(_context, _registry);
         _assetBrowserPanel.Initialize(_context);
 
-        // Build Project menu programmatically (avoids Designer.cs C#-version concerns)
+        // Build menus programmatically (avoids Designer.cs C#-version concerns)
+        BuildFileMenuExtras();
         BuildProjectMenu();
     }
 
@@ -401,6 +404,125 @@ public sealed partial class EditorForm : Form
 
     #region Menu — File
 
+    private void BuildFileMenuExtras()
+    {
+        // "Open Recent ▶" submenu
+        _openRecentMenuItem = new ToolStripMenuItem("Open Recent");
+
+        // "Save Project" Ctrl+S
+        _saveProjectMenuItem = new ToolStripMenuItem("Save Project")
+        {
+            ShortcutKeys = Keys.Control | Keys.S,
+            ShowShortcutKeys = true,
+        };
+        _saveProjectMenuItem.Click += OnFileSaveProjectClick;
+
+        // Insert before _fileSeparator: [New | Open] → [New | Open | Recent ▶ | ─── | Save | ─── | Exit]
+        int sepIdx = _fileMenu.DropDownItems.IndexOf(_fileSeparator);
+        _fileMenu.DropDownItems.Insert(sepIdx, _openRecentMenuItem);
+
+        sepIdx = _fileMenu.DropDownItems.IndexOf(_fileSeparator);
+        _fileMenu.DropDownItems.Insert(sepIdx, new ToolStripSeparator());
+
+        sepIdx = _fileMenu.DropDownItems.IndexOf(_fileSeparator);
+        _fileMenu.DropDownItems.Insert(sepIdx, _saveProjectMenuItem);
+
+        RebuildOpenRecentsMenu();
+    }
+
+    private void RebuildOpenRecentsMenu()
+    {
+        _openRecentMenuItem.DropDownItems.Clear();
+        _openRecentMenuItem.Enabled = _preferences.RecentProjects.Count > 0;
+
+        for (int i = 0; i < _preferences.RecentProjects.Count; i++)
+        {
+            string path = _preferences.RecentProjects[i];
+            string label = $"{i + 1}. {path}";
+            ToolStripMenuItem item = new(label) { Tag = path };
+            item.Click += OnOpenRecentProjectClick;
+            _openRecentMenuItem.DropDownItems.Add(item);
+        }
+    }
+
+    private async void OnOpenRecentProjectClick(object? sender, EventArgs e)
+    {
+        if (sender is not ToolStripMenuItem item || item.Tag is not string path) return;
+
+        try
+        {
+            EditorProject? project = await Task.Run(() => ProjectManager.Load(path)).ConfigureAwait(true);
+            if (project is null)
+            {
+                MessageBox.Show(this,
+                    $"Could not load project from:\n{path}\n\nThe project file may have been moved or deleted.",
+                    "Project Not Found", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                _preferences.RecentProjects.Remove(path);
+                _preferences.Save();
+                RebuildOpenRecentsMenu();
+                return;
+            }
+
+            _context.SetActiveProject(project);
+            _preferences.AddRecentProject(project.RootPath);
+            RebuildOpenRecentsMenu();
+            _consolePanel.AppendLine($"[Editor] Project '{project.Name}' opened from {project.RootPath}");
+        }
+        catch (Exception ex)
+        {
+            _consolePanel.AppendLine($"[Editor] Failed to open recent project: {ex.Message}");
+        }
+    }
+
+    private async void OnFileSaveProjectClick(object? sender, EventArgs e)
+    {
+        EditorScene? scene = _context.ActiveScene;
+        EditorProject? project = _context.ActiveProject;
+
+        if (scene is null && project is null)
+        {
+            _consolePanel.AppendLine("[Save] Nothing to save — no project or scene is open.");
+            return;
+        }
+
+        try
+        {
+            if (scene is not null)
+            {
+                string scenePath = scene.ScenePath;
+
+                if (string.IsNullOrEmpty(scenePath))
+                {
+                    string initialDir = project is not null && Directory.Exists(project.ScenesPath)
+                        ? project.ScenesPath
+                        : Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+
+                    using SaveFileDialog dlg = new()
+                    {
+                        Title = "Save Scene",
+                        Filter = "Scene files (*.scene.json)|*.scene.json|All files (*.*)|*.*",
+                        InitialDirectory = initialDir,
+                        FileName = string.IsNullOrEmpty(scene.Name) ? "NewScene.scene.json" : $"{scene.Name}.scene.json",
+                    };
+
+                    if (dlg.ShowDialog(this) != DialogResult.OK) return;
+                    scenePath = dlg.FileName;
+                    scene.ScenePath = scenePath;
+                    scene.Name = Path.GetFileNameWithoutExtension(Path.GetFileNameWithoutExtension(scenePath));
+                }
+
+                await SceneSerializer.SaveAsync(scene, scenePath).ConfigureAwait(true);
+                _consolePanel.AppendLine($"[Save] Scene saved to {scenePath}");
+                _statusLabel.Text = "Saved.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _consolePanel.AppendLine($"[Save] Error: {ex.Message}");
+            _statusLabel.Text = "Save failed.";
+        }
+    }
+
     private async void OnFileNewProjectClick(object? sender, EventArgs e)
     {
         using NewProjectDialog dlg = new();
@@ -411,6 +533,7 @@ public sealed partial class EditorForm : Form
             EditorProject project = await Task.Run(() => ProjectManager.Create(dlg.ProjectName, dlg.ParentPath));
             _context.SetActiveProject(project);
             _preferences.LastProjectPath = project.RootPath;
+            _preferences.AddRecentProject(project.RootPath);
             _preferences.Save();
             _consolePanel.AppendLine($"[Editor] Project '{project.Name}' created at {project.RootPath}");
         }
@@ -462,6 +585,7 @@ public sealed partial class EditorForm : Form
 
             _context.SetActiveProject(project);
             _preferences.LastProjectPath = project.RootPath;
+            _preferences.AddRecentProject(project.RootPath);
             _preferences.Save();
             _consolePanel.AppendLine($"[Editor] Project '{project.Name}' opened from {project.RootPath}");
         }
@@ -482,6 +606,8 @@ public sealed partial class EditorForm : Form
 
         string contentPath = evt.Project?.ContentPath ?? string.Empty;
         _contentWatcher.Watch(contentPath);
+
+        RebuildOpenRecentsMenu();
     }
 
     #endregion

@@ -3,6 +3,8 @@ namespace MonoGame.Editor.Core.Preferences;
 /// <summary>Editor layout and session preferences, persisted to disk between sessions.</summary>
 public sealed class EditorPreferences
 {
+    private const int MaxRecentProjects = 10;
+
     private static readonly string DefaultPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "MonoGameEditor",
@@ -43,8 +45,25 @@ public sealed class EditorPreferences
     /// <summary>Absolute path of the last project opened, or empty if none.</summary>
     public string LastProjectPath { get; set; } = string.Empty;
 
+    /// <summary>Ordered list of recently opened project paths (newest first, max 10 entries).</summary>
+    public List<string> RecentProjects { get; set; } = [];
+
     /// <summary>Width of the folder tree inside the asset browser panel in pixels.</summary>
     public int AssetBrowserSplitterDistance { get; set; } = 180;
+
+    /// <summary>
+    /// Adds <paramref name="path"/> to the front of <see cref="RecentProjects"/>, removes any
+    /// duplicate entry, and trims the list to <see cref="MaxRecentProjects"/> items. Persists immediately.
+    /// </summary>
+    public void AddRecentProject(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return;
+        RecentProjects.Remove(path);
+        RecentProjects.Insert(0, path);
+        if (RecentProjects.Count > MaxRecentProjects)
+            RecentProjects.RemoveRange(MaxRecentProjects, RecentProjects.Count - MaxRecentProjects);
+        Save();
+    }
 
     /// <summary>Serializes current preferences to disk.</summary>
     public void Save()
@@ -78,6 +97,8 @@ public sealed class EditorPreferences
             ConsoleVisible = loaded.ConsoleVisible;
             LastProjectPath = loaded.LastProjectPath;
             AssetBrowserSplitterDistance = loaded.AssetBrowserSplitterDistance;
+            RecentProjects.Clear();
+            RecentProjects.AddRange(loaded.RecentProjects);
         }
         catch (JsonException) { }
     }
