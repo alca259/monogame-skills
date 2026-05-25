@@ -15,10 +15,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Alca.MonoGame.Kernel\Alca.MonoGame.Kernel.csproj" />
+    <MonoGameContentReference Include="Content\Content.mgcb" />
   </ItemGroup>
 
   <ItemGroup>
-    <MonoGameContentReference Include="Content\Content.mgcb" />
+    <ProjectReference Include="..\..\Library\Alca.MonoGame.Kernel\Alca.MonoGame.Kernel.csproj" />
   </ItemGroup>
 </Project>

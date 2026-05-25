@@ -11,6 +11,9 @@
     <Authors>Alca</Authors>
     <Company>Alca259</Company>
     <Product>Alca MonoGame Framework</Product>
+
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageOutputPath>F:\Dev\NugetLocal\</PackageOutputPath>
   </PropertyGroup>
 
   <ItemGroup>
