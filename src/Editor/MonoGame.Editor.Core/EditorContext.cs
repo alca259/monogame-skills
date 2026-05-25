@@ -17,6 +17,7 @@ public sealed class EditorContext
     private EditorProject? _activeProject;
     private readonly InternalEditorLogger _logger;
     private bool _isSceneDirty;
+    private string? _playSnapshot;
 
     #region Singleton
 
@@ -176,6 +177,27 @@ public sealed class EditorContext
             _activeProject = project;
 
         EventBus.Publish(new ProjectOpenedEvent(project));
+    }
+
+    /// <summary>Serializes the active scene to an in-memory JSON snapshot for Play mode restore.</summary>
+    public void TakePlaySnapshot()
+    {
+        lock (_stateLock)
+            _playSnapshot = _activeScene is null ? null : SceneSerializer.Serialize(_activeScene);
+    }
+
+    /// <summary>Deserializes and returns the stored play snapshot, or <c>null</c> if none exists.</summary>
+    public EditorScene? RestoreFromSnapshot()
+    {
+        lock (_stateLock)
+            return _playSnapshot is null ? null : SceneSerializer.Deserialize(_playSnapshot);
+    }
+
+    /// <summary>Clears the stored play snapshot.</summary>
+    public void ClearPlaySnapshot()
+    {
+        lock (_stateLock)
+            _playSnapshot = null;
     }
 
     #endregion

@@ -20,6 +20,7 @@ global using MonoGame.Editor.Core.Tilemaps;
 global using MonoGame.Editor.Core.Localization;
 global using MonoGame.Editor.Core.Input;
 global using MonoGame.Editor.Core.CodeGen;
+global using MonoGame.Editor.Core.PlayMode;
 global using MonoGame.Editor.WinForms.Controls;
 global using MonoGame.Editor.WinForms.Dialogs;
 global using MonoGame.Editor.WinForms.Gizmos;

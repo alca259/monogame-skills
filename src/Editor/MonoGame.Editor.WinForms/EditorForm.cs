@@ -11,6 +11,7 @@ public sealed partial class EditorForm : Form
     private readonly PrefabManager  _prefabManager   = new();
     private readonly GizmoController _gizmoCtrl      = new();
     private GizmoRenderer?           _gizmoRenderer;
+    private PlayModeRunner?          _playRunner;
     private readonly ContentWatcher  _contentWatcher  = null!;
     private ToolStripMenuItem        _saveSceneMenuItem   = null!;
     private ToolStripMenuItem        _saveSceneAsMenuItem = null!;
@@ -176,6 +177,12 @@ public sealed partial class EditorForm : Form
 
     private async void OnPlayClick(object? sender, EventArgs e)
     {
+        if (_context.ActiveScene is null)
+        {
+            MessageBox.Show(this, "No scene is open.", "Play", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
         EditorState next = _context.State switch
         {
             EditorState.Editing => EditorState.Playing,
@@ -249,6 +256,37 @@ public sealed partial class EditorForm : Form
             EditorState.Paused  => "Paused",
             _                   => string.Empty,
         };
+
+        switch (evt.NewState)
+        {
+            case EditorState.Playing when evt.OldState == EditorState.Editing:
+                StartPlayMode();
+                break;
+            case EditorState.Editing:
+                StopPlayMode();
+                break;
+        }
+    }
+
+    private void StartPlayMode()
+    {
+        _context.TakePlaySnapshot();
+        _playRunner = new PlayModeRunner(_context.ActiveScene!, _registry);
+        _context.Logger.Log("[PlayMode] Started.", LogLevel.Info);
+    }
+
+    private void StopPlayMode()
+    {
+        _playRunner?.Dispose();
+        _playRunner = null;
+
+        EditorScene? restored = _context.RestoreFromSnapshot();
+        _context.ClearPlaySnapshot();
+
+        if (restored is not null)
+            _context.SetActiveScene(restored);
+
+        _context.Logger.Log("[PlayMode] Stopped — scene restored.", LogLevel.Info);
     }
 
     private void UpdatePlaybackButtons(EditorState state)
@@ -1228,7 +1266,32 @@ public sealed partial class EditorForm : Form
 
     private void OnViewportRenderFrame(object? sender, RenderEventArgs e)
     {
-        if (_gizmoRenderer == null) return;
+        EditorState state = _context.State;
+
+        if (state == EditorState.Playing || state == EditorState.Paused)
+        {
+            if (_playRunner is null) return;
+            _playRunner.EnsureInitialized(e.GraphicsDevice);
+
+            if (state == EditorState.Playing)
+                _playRunner.Update(e.Elapsed);
+
+            _playRunner.Draw(e.Elapsed);
+
+            // In Paused state, also draw gizmos so entities remain inspectable
+            if (state == EditorState.Editing || state == EditorState.Paused)
+                DrawEditorGizmos(e);
+
+            return;
+        }
+
+        // Editing mode — gizmo rendering only
+        DrawEditorGizmos(e);
+    }
+
+    private void DrawEditorGizmos(RenderEventArgs e)
+    {
+        if (_gizmoRenderer is null) return;
 
         if (!_gizmoRenderer.IsInitialized)
             _gizmoRenderer.Initialize(e.GraphicsDevice);
