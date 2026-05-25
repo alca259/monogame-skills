@@ -57,10 +57,15 @@ public sealed class EditModeRenderer : IDisposable
             transformMatrix: cameraTransform,
             samplerState: SamplerState.PointClamp,
             blendState: BlendState.AlphaBlend);
-
-        DrawObjectList(scene.RootGameObjects, gd);
-
-        _spriteBatch.End();
+        try
+        {
+            DrawObjectList(scene.RootGameObjects, gd);
+        }
+        catch { /* ignore per-object draw errors */ }
+        finally
+        {
+            _spriteBatch.End();
+        }
     }
 
     /// <inheritdoc/>

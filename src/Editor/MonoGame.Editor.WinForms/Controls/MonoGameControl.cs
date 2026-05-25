@@ -41,11 +41,31 @@ public sealed class MonoGameControl : Control
     /// <summary>Editor camera used to transform the viewport.</summary>
     public EditorCamera2D Camera { get; } = new();
 
+    /// <summary>Color used to clear the render target at the start of each frame.</summary>
+    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+    public Microsoft.Xna.Framework.Color ClearColor { get; set; } = new Microsoft.Xna.Framework.Color(30, 30, 30);
+
     /// <summary>
     /// Raised from the render thread once per frame, after the device is cleared.
     /// Subscribers can draw content using the provided <see cref="GraphicsDevice"/>.
     /// </summary>
     public event EventHandler<RenderEventArgs>? RenderFrame;
+
+    public MonoGameControl()
+    {
+        SetStyle(
+            ControlStyles.AllPaintingInWmPaint |
+            ControlStyles.UserPaint |
+            ControlStyles.Opaque,
+            true);
+        UpdateStyles();
+    }
+
+    /// <inheritdoc/>
+    protected override void OnPaintBackground(PaintEventArgs e) { }
+
+    /// <inheritdoc/>
+    protected override void OnPaint(PaintEventArgs e) { }
 
     /// <inheritdoc/>
     protected override void OnHandleCreated(EventArgs e)
@@ -229,7 +249,7 @@ public sealed class MonoGameControl : Control
         try
         {
             _graphicsDevice.SetRenderTarget(_swapChain);
-            _graphicsDevice.Clear(new Microsoft.Xna.Framework.Color(30, 30, 30));
+            _graphicsDevice.Clear(ClearColor);
 
             RenderFrame?.Invoke(this, new RenderEventArgs(_graphicsDevice, elapsed, _swapChain.Width, _swapChain.Height));
 

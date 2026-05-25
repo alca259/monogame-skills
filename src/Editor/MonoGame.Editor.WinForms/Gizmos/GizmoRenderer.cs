@@ -57,9 +57,15 @@ public sealed class GizmoRenderer : IDisposable
                 transformMatrix: cameraTransform,
                 samplerState: SamplerState.PointClamp,
                 blendState: BlendState.AlphaBlend);
-
-            DrawGrid(cameraTransform, viewW, viewH);
-            _spriteBatch.End();
+            try
+            {
+                DrawGrid(cameraTransform, viewW, viewH);
+            }
+            catch { /* ignore grid draw errors */ }
+            finally
+            {
+                _spriteBatch.End();
+            }
         }
 
         // ── Pass 2: screen-space bounding box + handles ──────────────────────
@@ -72,13 +78,18 @@ public sealed class GizmoRenderer : IDisposable
         _spriteBatch.Begin(
             samplerState: SamplerState.PointClamp,
             blendState: BlendState.AlphaBlend);
+        try
+        {
+            DrawBoundingBox(objScreen, selected.Scale.X, selected.Scale.Y, zoom);
 
-        DrawBoundingBox(objScreen, selected.Scale.X, selected.Scale.Y, zoom);
-
-        if (_ctrl.Mode != GizmoMode.Select)
-            DrawGizmoHandles(_ctrl.Mode, objScreen);
-
-        _spriteBatch.End();
+            if (_ctrl.Mode != GizmoMode.Select)
+                DrawGizmoHandles(_ctrl.Mode, objScreen);
+        }
+        catch { /* ignore handle draw errors */ }
+        finally
+        {
+            _spriteBatch.End();
+        }
     }
 
     // ── Grid ─────────────────────────────────────────────────────────────────

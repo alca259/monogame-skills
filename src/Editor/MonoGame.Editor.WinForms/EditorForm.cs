@@ -92,6 +92,7 @@ public sealed partial class EditorForm : Form
         FormClosing += OnFormClosing;
         _viewport.RenderFrame += OnViewportRenderFrame;
         _gameViewport.RenderFrame += OnGameViewportRenderFrame;
+        _gameViewport.ClearColor = new Microsoft.Xna.Framework.Color(15, 15, 25); // dark blue — distinct from scene
         _toolbarTable.Resize  += (_, _) => CenterPlaybackStrip();
 
         // Gizmo mouse interaction
