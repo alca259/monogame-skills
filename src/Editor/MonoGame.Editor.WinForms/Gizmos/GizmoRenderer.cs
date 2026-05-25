@@ -12,8 +12,8 @@ namespace MonoGame.Editor.WinForms.Gizmos;
 public sealed class GizmoRenderer : IDisposable
 {
     // ── Colours ───────────────────────────────────────────────────────────────
-    private static readonly XnaColor GridColor       = new(80, 80, 80, 55);
-    private static readonly XnaColor OriginAxisColor = new(100, 100, 100, 100);
+    private static readonly XnaColor GridColor       = new(70,  70,  70,  180);
+    private static readonly XnaColor OriginAxisColor = new(140, 140, 140, 220);
     private static readonly XnaColor BoundsColor     = new(255, 255, 255, 110);
     private static readonly XnaColor AxisXColor      = new(220, 60, 60);
     private static readonly XnaColor AxisYColor      = new(60, 200, 60);

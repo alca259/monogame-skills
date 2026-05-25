@@ -91,6 +91,7 @@ public sealed partial class EditorForm : Form
 
         FormClosing += OnFormClosing;
         _viewport.RenderFrame += OnViewportRenderFrame;
+        _gameViewport.RenderFrame += OnGameViewportRenderFrame;
         _toolbarTable.Resize  += (_, _) => CenterPlaybackStrip();
 
         // Gizmo mouse interaction
@@ -275,6 +276,7 @@ public sealed partial class EditorForm : Form
         _context.TakePlaySnapshot();
         _playRunner = new PlayModeRunner(_context.ActiveScene!, _registry);
         _context.Logger.Log("[PlayMode] Started.", LogLevel.Info);
+        _centerTabControl.SelectedTab = _gameTab;
     }
 
     private void StopPlayMode()
@@ -289,6 +291,7 @@ public sealed partial class EditorForm : Form
             _context.SetActiveScene(restored);
 
         _context.Logger.Log("[PlayMode] Stopped — scene restored.", LogLevel.Info);
+        _centerTabControl.SelectedTab = _sceneTab;
     }
 
     private void UpdatePlaybackButtons(EditorState state)
@@ -1289,27 +1292,23 @@ public sealed partial class EditorForm : Form
 
     private void OnViewportRenderFrame(object? sender, RenderEventArgs e)
     {
-        EditorState state = _context.State;
-
-        if (state == EditorState.Playing || state == EditorState.Paused)
-        {
-            if (_playRunner is null) return;
-            _playRunner.EnsureInitialized(e.GraphicsDevice);
-
-            if (state == EditorState.Playing)
-                _playRunner.Update(e.Elapsed);
-
-            _playRunner.Draw(e.Elapsed);
-
-            // In Paused state, also draw gizmos so entities remain inspectable
-            if (state == EditorState.Editing || state == EditorState.Paused)
-                DrawEditorGizmos(e);
-
-            return;
-        }
-
-        // Editing mode — gizmo rendering only
+        // Scene tab always renders the edit-mode overlay (grid, gizmos, sprite previews)
+        // regardless of play state — mirrors the Unity Scene view behaviour.
         DrawEditorGizmos(e);
+    }
+
+    private void OnGameViewportRenderFrame(object? sender, RenderEventArgs e)
+    {
+        EditorState state = _context.State;
+        if (state != EditorState.Playing && state != EditorState.Paused) return;
+
+        if (_playRunner is null) return;
+        _playRunner.EnsureInitialized(e.GraphicsDevice);
+
+        if (state == EditorState.Playing)
+            _playRunner.Update(e.Elapsed);
+
+        _playRunner.Draw(e.Elapsed);
     }
 
     private void DrawEditorGizmos(RenderEventArgs e)
@@ -1319,8 +1318,10 @@ public sealed partial class EditorForm : Form
         if (!_gizmoRenderer.IsInitialized)
             _gizmoRenderer.Initialize(e.GraphicsDevice);
 
-        int w = _viewport.ClientSize.Width;
-        int h = _viewport.ClientSize.Height;
+        // e.Width/Height come directly from _swapChain.Width/Height in the render thread —
+        // no WinForms cross-thread access, no reliance on GraphicsDevice.Viewport being set.
+        int w = e.Width;
+        int h = e.Height;
         if (w <= 0 || h <= 0) return;
 
         Viewport vp = new(0, 0, w, h);

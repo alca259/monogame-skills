@@ -3,13 +3,19 @@ using System.Diagnostics;
 namespace MonoGame.Editor.WinForms.Controls;
 
 /// <summary>Arguments passed to the <see cref="MonoGameControl.RenderFrame"/> event.</summary>
-public sealed class RenderEventArgs(GraphicsDevice graphicsDevice, TimeSpan elapsed) : EventArgs
+public sealed class RenderEventArgs(GraphicsDevice graphicsDevice, TimeSpan elapsed, int width, int height) : EventArgs
 {
     /// <summary>The active graphics device, usable for drawing operations.</summary>
     public GraphicsDevice GraphicsDevice { get; } = graphicsDevice;
 
     /// <summary>Time elapsed since the previous frame.</summary>
     public TimeSpan Elapsed { get; } = elapsed;
+
+    /// <summary>Current render-target width in pixels (safe to read from render thread).</summary>
+    public int Width { get; } = width;
+
+    /// <summary>Current render-target height in pixels (safe to read from render thread).</summary>
+    public int Height { get; } = height;
 }
 
 /// <summary>
@@ -225,7 +231,7 @@ public sealed class MonoGameControl : Control
             _graphicsDevice.SetRenderTarget(_swapChain);
             _graphicsDevice.Clear(new Microsoft.Xna.Framework.Color(30, 30, 30));
 
-            RenderFrame?.Invoke(this, new RenderEventArgs(_graphicsDevice, elapsed));
+            RenderFrame?.Invoke(this, new RenderEventArgs(_graphicsDevice, elapsed, _swapChain.Width, _swapChain.Height));
 
             _graphicsDevice.SetRenderTarget(null);
             _swapChain.Present();

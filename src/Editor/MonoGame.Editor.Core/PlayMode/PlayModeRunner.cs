@@ -47,13 +47,20 @@ public sealed class PlayModeRunner : IDisposable
         try
         {
             _spriteBatch.Begin();
-            _world.Draw(gt, _spriteBatch);
+            try
+            {
+                _world.Draw(gt, _spriteBatch);
+            }
+            catch
+            {
+                // Behaviours that rely on game content (textures, fonts) will fail here;
+                // silently ignored — play mode still runs game logic correctly.
+            }
             _spriteBatch.End();
         }
         catch
         {
-            // Behaviours that rely on game content (textures, fonts) will fail here;
-            // silently ignored — play mode still runs game logic correctly.
+            // Device lost or SpriteBatch in bad state — recover on next frame.
         }
     }
 

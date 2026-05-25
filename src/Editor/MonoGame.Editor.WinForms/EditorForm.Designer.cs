@@ -51,7 +51,11 @@ partial class EditorForm
 
     // ── Panels ────────────────────────────────────────────────────────────
     private SceneHierarchyPanel _hierarchyPanel = null!;
+    private TabControl _centerTabControl = null!;
+    private TabPage _sceneTab = null!;
+    private TabPage _gameTab = null!;
     private MonoGameControl _viewport = null!;
+    private MonoGameControl _gameViewport = null!;
     private InspectorPanel _inspectorPanel = null!;
 
     // ── Bottom tabs ───────────────────────────────────────────────────────
@@ -119,7 +123,11 @@ partial class EditorForm
         _outerSplit               = new SplitContainer();
         _hierarchyPanel           = new SceneHierarchyPanel();
         _innerSplit               = new SplitContainer();
+        _centerTabControl         = new TabControl();
+        _sceneTab                 = new TabPage();
+        _gameTab                  = new TabPage();
         _viewport                 = new MonoGameControl();
+        _gameViewport             = new MonoGameControl();
         _inspectorPanel           = new InspectorPanel();
         _bottomTabControl         = new TabControl();
         _assetsTab                = new TabPage();
@@ -150,6 +158,8 @@ partial class EditorForm
         _innerSplit.Panel1.SuspendLayout();
         _innerSplit.Panel2.SuspendLayout();
         _innerSplit.SuspendLayout();
+        _sceneTab.SuspendLayout();
+        _gameTab.SuspendLayout();
         _assetsTab.SuspendLayout();
         _consoleTab.SuspendLayout();
         _sceneManagerTab.SuspendLayout();
@@ -441,8 +451,44 @@ partial class EditorForm
         _viewport.Dock = DockStyle.Fill;
         _viewport.Location = new System.Drawing.Point(0, 0);
         _viewport.Name = "_viewport";
-        _viewport.Size = new System.Drawing.Size(776, 527);
+        _viewport.Size = new System.Drawing.Size(776, 499);
         _viewport.TabIndex = 0;
+
+        // _gameViewport
+        _gameViewport.BackColor = System.Drawing.Color.FromArgb(20, 20, 20);
+        _gameViewport.Dock = DockStyle.Fill;
+        _gameViewport.Location = new System.Drawing.Point(0, 0);
+        _gameViewport.Name = "_gameViewport";
+        _gameViewport.Size = new System.Drawing.Size(776, 499);
+        _gameViewport.TabIndex = 0;
+
+        // _sceneTab
+        _sceneTab.Controls.Add(_viewport);
+        _sceneTab.Location = new System.Drawing.Point(4, 24);
+        _sceneTab.Name = "_sceneTab";
+        _sceneTab.Padding = new System.Windows.Forms.Padding(0);
+        _sceneTab.Size = new System.Drawing.Size(776, 499);
+        _sceneTab.TabIndex = 0;
+        _sceneTab.Text = "Scene";
+
+        // _gameTab
+        _gameTab.Controls.Add(_gameViewport);
+        _gameTab.Location = new System.Drawing.Point(4, 24);
+        _gameTab.Name = "_gameTab";
+        _gameTab.Padding = new System.Windows.Forms.Padding(0);
+        _gameTab.Size = new System.Drawing.Size(776, 499);
+        _gameTab.TabIndex = 1;
+        _gameTab.Text = "Game";
+
+        // _centerTabControl
+        _centerTabControl.Controls.Add(_sceneTab);
+        _centerTabControl.Controls.Add(_gameTab);
+        _centerTabControl.Dock = DockStyle.Fill;
+        _centerTabControl.Location = new System.Drawing.Point(0, 0);
+        _centerTabControl.Name = "_centerTabControl";
+        _centerTabControl.SelectedIndex = 0;
+        _centerTabControl.Size = new System.Drawing.Size(776, 527);
+        _centerTabControl.TabIndex = 0;
 
         // _inspectorPanel
         _inspectorPanel.Dock = DockStyle.Fill;
@@ -456,7 +502,7 @@ partial class EditorForm
         _innerSplit.Location = new System.Drawing.Point(0, 0);
         _innerSplit.Name = "_innerSplit";
         _innerSplit.Orientation = Orientation.Vertical;
-        _innerSplit.Panel1.Controls.Add(_viewport);
+        _innerSplit.Panel1.Controls.Add(_centerTabControl);
         _innerSplit.Panel2.Controls.Add(_inspectorPanel);
         _innerSplit.Size = new System.Drawing.Size(1056, 527);
         _innerSplit.SplitterDistance = 776;
@@ -608,6 +654,8 @@ partial class EditorForm
         _innerSplit.Panel2.ResumeLayout(false);
         ((System.ComponentModel.ISupportInitialize)_innerSplit).EndInit();
         _innerSplit.ResumeLayout(false);
+        _sceneTab.ResumeLayout(false);
+        _gameTab.ResumeLayout(false);
         _assetsTab.ResumeLayout(false);
         _consoleTab.ResumeLayout(false);
         _sceneManagerTab.ResumeLayout(false);
