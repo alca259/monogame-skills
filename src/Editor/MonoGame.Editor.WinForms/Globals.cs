@@ -25,3 +25,4 @@ global using MonoGame.Editor.WinForms.Controls;
 global using MonoGame.Editor.WinForms.Dialogs;
 global using MonoGame.Editor.WinForms.Gizmos;
 global using MonoGame.Editor.WinForms.Panels;
+global using MonoGame.Editor.WinForms.Rendering;

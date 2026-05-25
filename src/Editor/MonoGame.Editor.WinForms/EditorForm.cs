@@ -11,6 +11,7 @@ public sealed partial class EditorForm : Form
     private readonly PrefabManager  _prefabManager   = new();
     private readonly GizmoController _gizmoCtrl      = new();
     private GizmoRenderer?           _gizmoRenderer;
+    private EditModeRenderer?        _editRenderer;
     private PlayModeRunner?          _playRunner;
     private readonly ContentWatcher  _contentWatcher  = null!;
     private ToolStripMenuItem        _saveSceneMenuItem   = null!;
@@ -139,6 +140,7 @@ public sealed partial class EditorForm : Form
         _context.EventBus.Unsubscribe<SceneDirtyChangedEvent>(OnSceneDirtyChanged);
         _contentWatcher.Dispose();
         _gizmoRenderer?.Dispose();
+        _editRenderer?.Dispose();
         base.OnFormClosed(e);
     }
 
@@ -210,7 +212,7 @@ public sealed partial class EditorForm : Form
         try
         {
             int exitCode = await MgcbRunner.RunAsync(mgcbFile,
-                line => _consolePanel.AppendLine(line)).ConfigureAwait(false);
+                line => BeginInvoke(() => _consolePanel.AppendLine(line))).ConfigureAwait(true);
 
             if (exitCode != 0)
             {
@@ -535,7 +537,7 @@ public sealed partial class EditorForm : Form
         try
         {
             int exitCode = await MgcbRunner.RunAsync(mgcbFile,
-                line => _consolePanel.AppendLine(line)).ConfigureAwait(true);
+                line => BeginInvoke(() => _consolePanel.AppendLine(line))).ConfigureAwait(true);
 
             string result = exitCode == 0 ? "Build succeeded." : $"Build failed (exit {exitCode}).";
             _consolePanel.AppendLine($"[Build] {result}");
@@ -819,7 +821,7 @@ public sealed partial class EditorForm : Form
         {
             if (File.Exists(candidates[i]))
             {
-                await _registry.ScanFromAssemblyAsync(candidates[i]).ConfigureAwait(false);
+                await _registry.ScanFromAssemblyAsync(candidates[i]).ConfigureAwait(true);
                 _consolePanel.AppendLine($"[CodeGen] Assembly scanned: {Path.GetFileName(candidates[i])} — {_registry.RegisteredTypes.Count} type(s).", LogLevel.Info);
                 return;
             }
@@ -827,15 +829,19 @@ public sealed partial class EditorForm : Form
 
         // Fallback: scan source files
         if (Directory.Exists(project.GameSourcePath))
-            await _registry.ScanSourceAsync(project.GameSourcePath).ConfigureAwait(false);
+            await _registry.ScanSourceAsync(project.GameSourcePath).ConfigureAwait(true);
     }
 
     private async void OnNewBehaviourClick(object? sender, EventArgs e)
     {
         EditorProject? project = _context.ActiveProject;
         string gameSourcePath  = project?.GameSourcePath ?? string.Empty;
+        string projectRootPath = project?.RootPath       ?? string.Empty;
+        string defaultNs       = string.IsNullOrEmpty(project?.GameCsprojPath)
+            ? string.Empty
+            : Path.GetFileNameWithoutExtension(project.GameCsprojPath);
 
-        using NewBehaviourDialog dlg = new(gameSourcePath);
+        using NewBehaviourDialog dlg = new(gameSourcePath, projectRootPath, defaultNs);
         if (dlg.ShowDialog(this) != DialogResult.OK) return;
 
         if (string.IsNullOrEmpty(dlg.ClassName)) return;
@@ -1031,7 +1037,7 @@ public sealed partial class EditorForm : Form
         {
             CodeGenResult result = await _codeGenService
                 .GenerateSceneAsync(scene, project, settings)
-                .ConfigureAwait(false);
+                .ConfigureAwait(true);
 
             if (result.Success)
                 _consolePanel.AppendLine($"[CodeGen] Generated: {result.OutputPath}", LogLevel.Info);
@@ -1088,7 +1094,7 @@ public sealed partial class EditorForm : Form
         }
     }
 
-    private void OnFileNewSceneClick(object? sender, EventArgs e)
+    private async void OnFileNewSceneClick(object? sender, EventArgs e)
     {
         if (_context is null) return;
 
@@ -1100,6 +1106,23 @@ public sealed partial class EditorForm : Form
             Name      = dlg.SceneName,
             WorldSize = new EditorVector2(dlg.WorldWidth, dlg.WorldHeight),
         };
+
+        EditorProject? project = _context.ActiveProject;
+        if (project is not null && !string.IsNullOrEmpty(project.ScenesPath))
+        {
+            Directory.CreateDirectory(project.ScenesPath);
+            string safeName = string.Concat(scene.Name.Split(Path.GetInvalidFileNameChars()));
+            string path = Path.Combine(project.ScenesPath, safeName + ".scene.json");
+            scene.ScenePath = path;
+            try
+            {
+                await SceneSerializer.SaveAsync(scene, path).ConfigureAwait(true);
+            }
+            catch (Exception ex)
+            {
+                _consolePanel.AppendLine($"[Editor] Failed to save scene: {ex.Message}", LogLevel.Error);
+            }
+        }
 
         _context.SetActiveScene(scene);
         _context.EventBus.Publish(new SceneCreatedEvent(scene));
@@ -1218,7 +1241,7 @@ public sealed partial class EditorForm : Form
     {
         try
         {
-            _projectSettings = await ProjectSettings.LoadAsync(project).ConfigureAwait(false);
+            _projectSettings = await ProjectSettings.LoadAsync(project).ConfigureAwait(true);
         }
         catch (Exception ex)
         {
@@ -1302,6 +1325,13 @@ public sealed partial class EditorForm : Form
 
         Viewport vp = new(0, 0, w, h);
         Matrix cameraTransform = _viewport.Camera.GetTransformMatrix(vp);
+
+        // Render edit-mode sprite previews before gizmo overlays.
+        _editRenderer ??= new EditModeRenderer(_context);
+        if (!_editRenderer.IsInitialized)
+            _editRenderer.Initialize(e.GraphicsDevice);
+        if (_context.ActiveScene is not null)
+            _editRenderer.DrawScene(_context.ActiveScene, cameraTransform);
 
         _gizmoRenderer.Draw(_context.SelectedObject, cameraTransform, w, h);
     }

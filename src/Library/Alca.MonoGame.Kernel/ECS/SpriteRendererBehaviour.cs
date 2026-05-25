@@ -12,6 +12,12 @@ public sealed class SpriteRendererBehaviour : GameBehaviour
     /// <summary>Gets or sets the draw layer depth in the range [0, 1]. Default is 0 (front).</summary>
     public float LayerDepth { get; set; } = 0f;
 
+    /// <summary>
+    /// Content-relative path to the sprite texture (e.g. <c>Sprites/Player</c>).
+    /// Used by the editor to preview sprites and by the scene converter when loading at runtime.
+    /// </summary>
+    public string SpritePath { get; set; } = string.Empty;
+
     /// <summary>Creates a renderer that draws <paramref name="texture"/> centered at the entity's world-space position.</summary>
     public SpriteRendererBehaviour(Texture2D texture)
     {

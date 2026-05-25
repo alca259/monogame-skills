@@ -469,22 +469,51 @@ public sealed class InspectorPanel : UserControl
         if (!_registry.RegisteredTypes.TryGetValue(behaviour.TypeName, out Type? type)) return rows;
 
         PropertyInfo[] props = type.GetProperties(BindingFlags.Public | BindingFlags.Instance);
+
+        // Check whether ANY property carries the explicit attribute.
+        bool hasAnyAttribute = false;
+        for (int i = 0; i < props.Length; i++)
+        {
+            if (props[i].GetCustomAttribute<EditorPropertyAttribute>() is not null)
+            {
+                hasAnyAttribute = true;
+                break;
+            }
+        }
+
         for (int i = 0; i < props.Length; i++)
         {
             PropertyInfo prop = props[i];
             EditorPropertyAttribute? attr = prop.GetCustomAttribute<EditorPropertyAttribute>();
-            if (attr is null) continue;
 
-            string label = attr.Label ?? prop.Name;
+            // If this type has no [EditorProperty] at all (e.g. Kernel library types),
+            // fall back to showing all public read-write properties of supported types.
+            bool include = attr is not null
+                || (!hasAnyAttribute && prop.CanRead && prop.CanWrite
+                    && IsSupportedFallbackType(prop.PropertyType));
+
+            if (!include) continue;
+
+            string label = attr?.Label ?? prop.Name;
             Control ctrl = CreateControlForProperty(prop, attr, behaviour, owner);
             rows.Add((label, ctrl));
         }
         return rows;
     }
 
+    private static bool IsSupportedFallbackType(Type t) =>
+        t == typeof(bool)
+        || t == typeof(int)
+        || t == typeof(float)
+        || t == typeof(string)
+        || t == typeof(Vector2)
+        || t == typeof(Vector3)
+        || t == typeof(Microsoft.Xna.Framework.Color)
+        || t == typeof(System.Drawing.Color);
+
     private Control CreateControlForProperty(
         PropertyInfo prop,
-        EditorPropertyAttribute attr,
+        EditorPropertyAttribute? attr,
         EditorBehaviour behaviour,
         EditorGameObject owner)
     {
@@ -529,8 +558,8 @@ public sealed class InspectorPanel : UserControl
         {
             float current = behaviour.Properties.TryGetValue(prop.Name, out JsonElement el)
                 ? el.GetSingle() : 0f;
-            float min = attr.Min == float.MinValue ? -1_000_000f : attr.Min;
-            float max = attr.Max == float.MaxValue ?  1_000_000f : attr.Max;
+            float min = (attr?.Min ?? 0f) == float.MinValue ? -1_000_000f : (attr?.Min ?? -1_000_000f);
+            float max = (attr?.Max ?? 0f) == float.MaxValue ?  1_000_000f : (attr?.Max ??  1_000_000f);
             return MakeFloatControl(current, min, max, v =>
             {
                 if (_suppressUpdate) return;
@@ -634,6 +663,45 @@ public sealed class InspectorPanel : UserControl
             return colorRow;
         }
 
+        if (pType == typeof(Vector2))
+        {
+            float vx = 0f, vy = 0f;
+            if (behaviour.Properties.TryGetValue(prop.Name, out JsonElement v2El) && v2El.ValueKind == JsonValueKind.Object)
+            {
+                if (v2El.TryGetProperty("X", out JsonElement xEl)) vx = xEl.GetSingle();
+                if (v2El.TryGetProperty("Y", out JsonElement yEl)) vy = yEl.GetSingle();
+            }
+            return MakeVec2Control(vx, vy, (x, y) =>
+            {
+                if (_suppressUpdate) return;
+                JsonElement prev = behaviour.Properties.TryGetValue(prop.Name, out JsonElement prevEl) ? prevEl : default;
+                string json = $"{{\"X\":{x.ToString("R", System.Globalization.CultureInfo.InvariantCulture)},\"Y\":{y.ToString("R", System.Globalization.CultureInfo.InvariantCulture)}}}";
+                JsonElement newEl = JsonDocument.Parse(json).RootElement;
+                _context!.Commands.Execute(new SetPropertyCommand<JsonElement>(
+                    $"Set {prop.Name}", prev, newEl, v => behaviour.Properties[prop.Name] = v));
+            });
+        }
+
+        if (pType == typeof(Vector3))
+        {
+            float vx = 0f, vy = 0f, vz = 0f;
+            if (behaviour.Properties.TryGetValue(prop.Name, out JsonElement v3El) && v3El.ValueKind == JsonValueKind.Object)
+            {
+                if (v3El.TryGetProperty("X", out JsonElement xEl)) vx = xEl.GetSingle();
+                if (v3El.TryGetProperty("Y", out JsonElement yEl)) vy = yEl.GetSingle();
+                if (v3El.TryGetProperty("Z", out JsonElement zEl)) vz = zEl.GetSingle();
+            }
+            return MakeVec3Control(vx, vy, vz, (x, y, z) =>
+            {
+                if (_suppressUpdate) return;
+                JsonElement prev = behaviour.Properties.TryGetValue(prop.Name, out JsonElement prevEl) ? prevEl : default;
+                string json = $"{{\"X\":{x.ToString("R", System.Globalization.CultureInfo.InvariantCulture)},\"Y\":{y.ToString("R", System.Globalization.CultureInfo.InvariantCulture)},\"Z\":{z.ToString("R", System.Globalization.CultureInfo.InvariantCulture)}}}";
+                JsonElement newEl = JsonDocument.Parse(json).RootElement;
+                _context!.Commands.Execute(new SetPropertyCommand<JsonElement>(
+                    $"Set {prop.Name}", prev, newEl, v => behaviour.Properties[prop.Name] = v));
+            });
+        }
+
         // Fallback: read-only text box
         TextBox fallback = new TextBox
         {
@@ -651,7 +719,7 @@ public sealed class InspectorPanel : UserControl
     private void OnAddBehaviourClick(object? sender, EventArgs e)
     {
         if (_currentObject is null || _registry is null) return;
-        using AddBehaviourDialog dlg = new AddBehaviourDialog(_registry);
+        using AddBehaviourDialog dlg = new AddBehaviourDialog(_registry, _context?.ActiveProject);
         if (dlg.ShowDialog(this) != DialogResult.OK) return;
         if (dlg.SelectedTypeName is null) return;
 
@@ -706,6 +774,37 @@ public sealed class InspectorPanel : UserControl
 
         nx.ValueChanged += (_, _) => onChange((float)nx.Value, (float)ny.Value);
         ny.ValueChanged += (_, _) => onChange((float)nx.Value, (float)ny.Value);
+        return panel;
+    }
+
+    private Panel MakeVec3Control(float x, float y, float z, Action<float, float, float> onChange)
+    {
+        Panel panel = new Panel { Height = RowHeight };
+
+        Label lx = new Label { Text = "X", Width = 14, Dock = DockStyle.Left, TextAlign = System.Drawing.ContentAlignment.MiddleLeft };
+        NumericUpDown nx = CreateNumericUpDown((decimal)x, -1_000_000m, 1_000_000m, 3);
+        nx.Width = 54;
+        nx.Dock  = DockStyle.Left;
+
+        Label ly = new Label { Text = "Y", Width = 14, Dock = DockStyle.Left, TextAlign = System.Drawing.ContentAlignment.MiddleLeft };
+        NumericUpDown ny = CreateNumericUpDown((decimal)y, -1_000_000m, 1_000_000m, 3);
+        ny.Width = 54;
+        ny.Dock  = DockStyle.Left;
+
+        Label lz = new Label { Text = "Z", Width = 14, Dock = DockStyle.Left, TextAlign = System.Drawing.ContentAlignment.MiddleLeft };
+        NumericUpDown nz = CreateNumericUpDown((decimal)z, -1_000_000m, 1_000_000m, 3);
+        nz.Dock = DockStyle.Fill;
+
+        panel.Controls.Add(nz);
+        panel.Controls.Add(lz);
+        panel.Controls.Add(ny);
+        panel.Controls.Add(ly);
+        panel.Controls.Add(nx);
+        panel.Controls.Add(lx);
+
+        nx.ValueChanged += (_, _) => onChange((float)nx.Value, (float)ny.Value, (float)nz.Value);
+        ny.ValueChanged += (_, _) => onChange((float)nx.Value, (float)ny.Value, (float)nz.Value);
+        nz.ValueChanged += (_, _) => onChange((float)nx.Value, (float)ny.Value, (float)nz.Value);
         return panel;
     }
 

@@ -203,6 +203,7 @@ public sealed class AssetBrowserPanel : UserControl
         };
         _rightSplit.Panel1.Controls.Add(rightTopPanel);
         _rightSplit.Panel2.Controls.Add(_previewPanel);
+        _rightSplit.Panel2Collapsed = true;   // hidden until an asset is selected
 
         // ── Outer split (tree / right) ────────────────────────────────────
         _outerSplit = new SplitContainer
@@ -418,16 +419,19 @@ public sealed class AssetBrowserPanel : UserControl
     {
         if (_contentView.SelectedItems.Count == 0)
         {
+            _rightSplit.Panel2Collapsed = true;
             ClearPreview();
             return;
         }
 
         if (_contentView.SelectedItems[0].Tag is not AssetInfo info)
         {
+            _rightSplit.Panel2Collapsed = true;
             ClearPreview();
             return;
         }
 
+        _rightSplit.Panel2Collapsed = false;
         ShowPreview(info);
     }
 
@@ -556,10 +560,13 @@ public sealed class AssetBrowserPanel : UserControl
     {
         LinkLabel lnk = new LinkLabel
         {
-            Text     = text,
-            AutoSize = true,
-            Tag      = path,
+            Text      = text,
+            AutoSize  = true,
+            Tag       = path,
             TextAlign = System.Drawing.ContentAlignment.MiddleLeft,
+            LinkColor        = System.Drawing.Color.FromArgb(180, 180, 180),
+            VisitedLinkColor = System.Drawing.Color.FromArgb(140, 140, 140),
+            ActiveLinkColor  = System.Drawing.Color.White,
         };
         lnk.LinkClicked += (_, _) =>
         {

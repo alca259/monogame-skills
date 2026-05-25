@@ -21,6 +21,7 @@ public sealed class NewBehaviourDialog : Form
     private readonly Label             _validationLabel;
 
     private readonly string _gameSourcePath;
+    private readonly string _projectRootPath;
 
     /// <summary>The validated class name entered by the user.</summary>
     public string ClassName => _classNameBox.Text.Trim();
@@ -44,9 +45,11 @@ public sealed class NewBehaviourDialog : Form
     }
 
     /// <summary>Creates the dialog, optionally pre-populating known namespaces.</summary>
-    public NewBehaviourDialog(string gameSourcePath = "", IEnumerable<string>? knownNamespaces = null)
+    public NewBehaviourDialog(string gameSourcePath = "", string projectRootPath = "",
+        string defaultNamespace = "", IEnumerable<string>? knownNamespaces = null)
     {
         _gameSourcePath = gameSourcePath;
+        _projectRootPath = projectRootPath;
 
         Text            = "Create New Behaviour";
         FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -85,6 +88,8 @@ public sealed class NewBehaviourDialog : Form
             foreach (string ns in knownNamespaces)
                 _namespaceBox.Items.Add(ns);
         }
+        if (!string.IsNullOrEmpty(defaultNamespace))
+            _namespaceBox.Text = defaultNamespace;
         layout.Controls.Add(_namespaceBox, 1, 1);
 
         // Row 2 — Subfolder
@@ -174,10 +179,25 @@ public sealed class NewBehaviourDialog : Form
 
         if (dlg.ShowDialog(this) != DialogResult.OK) return;
 
+        // Validate the chosen folder is inside the project root.
+        string root = string.IsNullOrEmpty(_projectRootPath) ? _gameSourcePath : _projectRootPath;
+        if (!string.IsNullOrEmpty(root))
+        {
+            string fullChosen = Path.GetFullPath(dlg.SelectedPath);
+            string fullRoot   = Path.GetFullPath(root);
+            if (!fullChosen.StartsWith(fullRoot, StringComparison.OrdinalIgnoreCase))
+            {
+                _validationLabel.Text = "Folder must be inside the project directory.";
+                return;
+            }
+        }
+
         string rel = string.IsNullOrEmpty(_gameSourcePath)
             ? dlg.SelectedPath
             : Path.GetRelativePath(_gameSourcePath, dlg.SelectedPath);
         _subfolderBox.Text = rel;
+        if (_validationLabel.Text == "Folder must be inside the project directory.")
+            _validationLabel.Text = string.Empty;
     }
 
     private void UpdateValidation()

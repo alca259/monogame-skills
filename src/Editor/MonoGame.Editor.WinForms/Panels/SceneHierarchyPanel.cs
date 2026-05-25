@@ -172,6 +172,17 @@ public sealed class SceneHierarchyPanel : UserControl
     {
         if (InvokeRequired) { BeginInvoke(() => OnSceneLoaded(evt)); return; }
         RebuildTree(evt.Scene);
+
+        // Auto-select the first root object so the inspector populates immediately.
+        if (_tree.Nodes.Count > 0 && _tree.Nodes[0].Tag is EditorGameObject first)
+        {
+            _suppressSelectionEvent = true;
+            _tree.SelectedNode = _tree.Nodes[0];
+            _suppressSelectionEvent = false;
+            _multiSelected.Clear();
+            _multiSelected.Add(first);
+            _context?.SetSelection(first);
+        }
     }
 
     private void OnGameObjectSelected(GameObjectSelectedEvent evt)
@@ -641,6 +652,9 @@ public sealed class SceneHierarchyPanel : UserControl
         _suppressSelectionEvent = true;
         _tree.SelectedNode = node;
         _suppressSelectionEvent = false;
+        _multiSelected.Clear();
+        _multiSelected.Add(obj);
+        _context?.SetSelection(obj);
         node.BeginEdit();
     }
 

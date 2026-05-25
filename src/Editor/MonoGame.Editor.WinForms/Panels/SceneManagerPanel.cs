@@ -139,7 +139,7 @@ public sealed class SceneManagerPanel : UserControl
         _deleteSceneButton.Enabled = _sceneList.SelectedItems.Count > 0;
     }
 
-    private void OnNewSceneClick(object? sender, EventArgs e)
+    private async void OnNewSceneClick(object? sender, EventArgs e)
     {
         if (_context is null) return;
 
@@ -151,6 +151,20 @@ public sealed class SceneManagerPanel : UserControl
             Name      = dlg.SceneName,
             WorldSize = new EditorVector2(dlg.WorldWidth, dlg.WorldHeight),
         };
+
+        EditorProject? project = _context.ActiveProject;
+        if (project is not null && !string.IsNullOrEmpty(project.ScenesPath))
+        {
+            Directory.CreateDirectory(project.ScenesPath);
+            string safeName = string.Concat(scene.Name.Split(Path.GetInvalidFileNameChars()));
+            string path = Path.Combine(project.ScenesPath, safeName + ".scene.json");
+            scene.ScenePath = path;
+            try
+            {
+                await SceneSerializer.SaveAsync(scene, path).ConfigureAwait(true);
+            }
+            catch { /* non-fatal — scene is open in memory */ }
+        }
 
         _context.SetActiveScene(scene);
         _context.EventBus.Publish(new SceneCreatedEvent(scene));
