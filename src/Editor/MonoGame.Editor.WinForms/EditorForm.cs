@@ -287,7 +287,11 @@ public sealed partial class EditorForm : Form
         _context.TakePlaySnapshot();
         _playRunner = new PlayModeRunner(_context.ActiveScene!, _registry);
         _context.Logger.Log("[PlayMode] Started.", LogLevel.Info);
+        _viewport.IsActive = false;
+        _gameViewport.IsActive = true;
         _centerTabControl.SelectedTab = _gameTab;
+        _gameViewport.BringToFront();
+        _gameViewport.Invalidate();
     }
 
     private void StopPlayMode()
@@ -302,7 +306,13 @@ public sealed partial class EditorForm : Form
             _context.SetActiveScene(restored);
 
         _context.Logger.Log("[PlayMode] Stopped — scene restored.", LogLevel.Info);
+        _gameViewport.IsActive = false;
+        _viewport.IsActive = true;
         _centerTabControl.SelectedTab = _sceneTab;
+        _viewport.BringToFront();
+        _viewport.Invalidate();
+        _sceneTab.Invalidate();
+        _centerTabControl.Invalidate();
     }
 
     private void UpdatePlaybackButtons(EditorState state)

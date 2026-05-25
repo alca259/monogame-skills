@@ -29,6 +29,7 @@ public sealed class MonoGameControl : Control
     private Thread? _renderThread;
     private volatile bool _running;
     private volatile bool _resizePending;
+    private IntPtr _windowHandle;
 
     private readonly Lock _resizeLock = new();
     private int _pendingWidth;
@@ -79,6 +80,7 @@ public sealed class MonoGameControl : Control
         base.OnHandleCreated(e);
         if (DesignMode) return;
 
+        _windowHandle = Handle;
         InitializeGraphics();
         StartRenderLoop();
     }
@@ -90,6 +92,7 @@ public sealed class MonoGameControl : Control
         _renderThread?.Join(2000);
         _swapChain?.Dispose();
         _graphicsDevice?.Dispose();
+        _windowHandle = IntPtr.Zero;
         base.OnHandleDestroyed(e);
     }
 
@@ -161,6 +164,9 @@ public sealed class MonoGameControl : Control
     {
         try
         {
+            if (_windowHandle == IntPtr.Zero)
+                return;
+
             int w = Math.Max(1, ClientSize.Width);
             int h = Math.Max(1, ClientSize.Height);
 
@@ -170,13 +176,13 @@ public sealed class MonoGameControl : Control
                 BackBufferHeight = h,
                 BackBufferFormat = SurfaceFormat.Color,
                 DepthStencilFormat = DepthFormat.Depth24,
-                DeviceWindowHandle = Handle,
+                DeviceWindowHandle = _windowHandle,
                 PresentationInterval = PresentInterval.Immediate,
                 IsFullScreen = false,
             };
 
             _graphicsDevice = new GraphicsDevice(GraphicsAdapter.DefaultAdapter, GraphicsProfile.HiDef, pp);
-            _swapChain = new SwapChainRenderTarget(_graphicsDevice, Handle, w, h);
+            _swapChain = new SwapChainRenderTarget(_graphicsDevice, _windowHandle, w, h);
         }
         catch (Exception ex)
         {
@@ -241,8 +247,11 @@ public sealed class MonoGameControl : Control
 
         try
         {
+            if (_windowHandle == IntPtr.Zero)
+                return;
+
             _swapChain?.Dispose();
-            _swapChain = new SwapChainRenderTarget(_graphicsDevice!, Handle, w, h);
+            _swapChain = new SwapChainRenderTarget(_graphicsDevice!, _windowHandle, w, h);
         }
         catch { /* ignore resize errors */ }
     }
