@@ -18,7 +18,7 @@ El objetivo es extenderla con todos los sistemas cubiertos por las skills dispon
 
 **Reglas transversales a todos los desarrollos:**
 - Al terminar, debe actualizarse el fichero roadmap.md, marcando que se ha hecho de los TODOs.
-- Al terminar el desarrollo de una fase, **debe** escribirse el correspondiente Test unitario con xUnit en el proyecto `src\Alca.MonoGame.Kernel.UnitTests`
+- Al terminar el desarrollo de una fase, **debe** escribirse el correspondiente Test unitario con xUnit en el proyecto `src\Library\Alca.MonoGame.Kernel.UnitTests`
 - Todos los ficheros de tests que se escriban deben estar bajo la misma nomenclatura que la carpeta origen, es decir, si un fichero de servicio/helper/otros está en `Utils/MyFileName.cs` en el proyecto de test debe estar bajo la carpeta `Utils`.
 - Para facilitar la búsqueda de tests, todos los ficheros de test deben llevar el nombre del fichero que prueban y `Tests` concatenado al final.
 
@@ -26,7 +26,7 @@ El objetivo es extenderla con todos los sistemas cubiertos por las skills dispon
 
 ## Prerrequisito: Dependencias NuGet ✅ COMPLETADO
 
-**Archivo:** `src/Alca.MonoGame.Kernel/Alca.MonoGame.Kernel.csproj`
+**Archivo:** `src/Library/Alca.MonoGame.Kernel/Alca.MonoGame.Kernel.csproj`
 
 Paquete añadido:
 - `MonoGame.Extended` 6.0.* (incluye Tiled, Tweening, Particles, BitmapFonts en un único paquete a partir de v6)
@@ -699,7 +699,7 @@ Todos inicializados en `Initialize()` de Core.
 ## Estructura Final de Carpetas
 
 ```
-src/Alca.MonoGame.Kernel/
+src/Library/Alca.MonoGame.Kernel/
 ├── Audio/
 │   ├── AudioController.cs         (modificar)
 │   ├── AudioEmitter3D.cs          (nuevo)
@@ -833,7 +833,7 @@ src/Alca.MonoGame.Kernel/
 ### Solución y proyectos
 
 ```
-src/
+src/Library/
 ├── Alca.MonoGame.Kernel/                  ← librería principal
 │   └── Alca.MonoGame.Kernel.csproj
 └── Alca.MonoGame.Kernel.UnitTests/        ← tests xUnit

@@ -11,7 +11,7 @@
 **Reglas transversales a todos los desarrollos:**
 - Al terminar, actualizar este fichero marcando los TODOs completados.
 
-**`src/Alca.MonoGame.Demo/`** — proyecto ejecutable (`OutputType=WinExe`)
+**`src/Demo/Alca.MonoGame.Demo/`** — proyecto ejecutable (`OutputType=WinExe`)
 - `DemoGame.cs` — `sealed class DemoGame : Core`
 - Escenas ECS:
   - `Scenes/EcsDemoScene.cs` — demo de jerarquía ECS con `TransformBehaviour` padre/hijo
@@ -30,7 +30,7 @@
 ## Estructura de carpetas
 
 ```
-src/Alca.MonoGame.Demo/
+src/Demo/Alca.MonoGame.Demo/
 ├── Scenes/
 │   ├── EcsDemoScene.cs
 │   ├── UIScene_BasicControls.cs

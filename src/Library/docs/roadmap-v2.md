@@ -347,7 +347,7 @@ public readonly struct LightContribution
 
 ### Estructura de carpetas
 
-src/Alca.MonoGame.Kernel/
+src/Library/Alca.MonoGame.Kernel/
 ├── Lighting/
 │   ├── AmbientLight.cs
 │   ├── DirectionalLight2D.cs
@@ -382,7 +382,7 @@ Ideas para roadmaps futuros (sin especificación todavía):
 ## Estructura de Carpetas ECS + Physics
 
 ```
-src/Alca.MonoGame.Kernel/
+src/Library/Alca.MonoGame.Kernel/
 ├── ECS/
 │   ├── GameBehaviour.cs       (modificado: Entity set-once, EntityOrNull)
 │   ├── GameEntity.cs          (modificado: jerarquía, API Unity-like, tags)
@@ -425,7 +425,7 @@ src/Alca.MonoGame.Kernel/
 ### Solución y proyectos
 
 ```
-src/
+src/Library/
 ├── Alca.MonoGame.Kernel/                  ← librería principal
 │   └── Alca.MonoGame.Kernel.csproj
 ├── Alca.MonoGame.Kernel.UnitTests/        ← tests xUnit
