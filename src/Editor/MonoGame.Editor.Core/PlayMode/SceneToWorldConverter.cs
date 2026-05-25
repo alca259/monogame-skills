@@ -1,8 +1,6 @@
 using System.Reflection;
-using System.Text.Json;
 using Alca.MonoGame.Kernel.ECS;
 using Microsoft.Xna.Framework;
-using MonoGame.Editor.Core.Models;
 using MonoGame.Editor.Core.Registry;
 
 namespace MonoGame.Editor.Core.PlayMode;
@@ -26,6 +24,9 @@ public static class SceneToWorldConverter
         GameObjectRegistry registry)
     {
         var entity = world.CreateEntity(obj.Name, new Vector2(obj.Position.X, obj.Position.Y));
+
+        ApplyTransform(entity, obj);
+
         if (parent is not null)
             entity.SetParent(parent);
 
@@ -37,6 +38,17 @@ public static class SceneToWorldConverter
 
         foreach (var child in obj.Children)
             CreateRecursive(world, child, entity, registry);
+    }
+
+    private static void ApplyTransform(GameEntity entity, EditorGameObject obj)
+    {
+        TransformBehaviour? transform = entity.Transform;
+        if (transform is null)
+            return;
+
+        transform.Position2d = new Vector2(obj.Position.X, obj.Position.Y);
+        transform.Rotation2d = obj.Rotation;
+        transform.LocalScale2d = new Vector2(obj.Scale.X, obj.Scale.Y);
     }
 
     private static void TryAddBehaviour(GameEntity entity, EditorBehaviour b, GameObjectRegistry registry)

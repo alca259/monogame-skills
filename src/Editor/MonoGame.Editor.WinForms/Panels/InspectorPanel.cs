@@ -32,6 +32,13 @@ public sealed class InspectorPanel : UserControl
 
     private Action<UndoPerformedEvent>? _onUndo;
     private Action<RedoPerformedEvent>? _onRedo;
+    private Action<GameObjectTransformChangedEvent>? _onTransformChanged;
+
+    private NumericUpDown? _positionXInput;
+    private NumericUpDown? _positionYInput;
+    private NumericUpDown? _rotationInput;
+    private NumericUpDown? _scaleXInput;
+    private NumericUpDown? _scaleYInput;
 
     #endregion
 
@@ -63,10 +70,12 @@ public sealed class InspectorPanel : UserControl
 
         _onUndo = _ => RebuildSafe();
         _onRedo = _ => RebuildSafe();
+        _onTransformChanged = OnGameObjectTransformChanged;
 
         _context.EventBus.Subscribe<GameObjectSelectedEvent>(OnGameObjectSelected);
         _context.EventBus.Subscribe<UndoPerformedEvent>(_onUndo);
         _context.EventBus.Subscribe<RedoPerformedEvent>(_onRedo);
+        _context.EventBus.Subscribe<GameObjectTransformChangedEvent>(_onTransformChanged);
     }
 
     protected override void Dispose(bool disposing)
@@ -76,6 +85,7 @@ public sealed class InspectorPanel : UserControl
             _context.EventBus.Unsubscribe<GameObjectSelectedEvent>(OnGameObjectSelected);
             if (_onUndo is not null) _context.EventBus.Unsubscribe<UndoPerformedEvent>(_onUndo);
             if (_onRedo is not null) _context.EventBus.Unsubscribe<RedoPerformedEvent>(_onRedo);
+            if (_onTransformChanged is not null) _context.EventBus.Unsubscribe<GameObjectTransformChangedEvent>(_onTransformChanged);
         }
         base.Dispose(disposing);
     }
@@ -93,8 +103,28 @@ public sealed class InspectorPanel : UserControl
 
     private void RebuildSafe()
     {
-        if (InvokeRequired) { BeginInvoke(RebuildContent); return; }
+        if (IsDisposed || Disposing || !IsHandleCreated)
+            return;
+
+        if (InvokeRequired)
+        {
+            BeginInvoke(() =>
+            {
+                if (!IsDisposed && !Disposing && IsHandleCreated)
+                    RebuildContent();
+            });
+            return;
+        }
+
         RebuildContent();
+    }
+
+    private void OnGameObjectTransformChanged(GameObjectTransformChangedEvent evt)
+    {
+        if (_currentObject is null || !ReferenceEquals(_currentObject, evt.GameObject))
+            return;
+
+        UpdateTransformInputsFromCurrentObject();
     }
 
     private void OnScrollPanelResized(object? sender, EventArgs e)
@@ -113,6 +143,11 @@ public sealed class InspectorPanel : UserControl
         _suppressUpdate = true;
         _scrollPanel.SuspendLayout();
         _scrollPanel.Controls.Clear();
+        _positionXInput = null;
+        _positionYInput = null;
+        _rotationInput = null;
+        _scaleXInput = null;
+        _scaleYInput = null;
 
         if (_currentObject is null)
         {
@@ -304,8 +339,14 @@ public sealed class InspectorPanel : UserControl
 
         // Position
         table.Controls.Add(MakeLabel("Position"), 0, 0);
-        table.Controls.Add(MakeVec2Control(
-            obj.Position.X, obj.Position.Y,
+        table.Controls.Add(BuildTransformVec2Editor(
+            obj.Position.X,
+            obj.Position.Y,
+            (nx, ny) =>
+            {
+                _positionXInput = nx;
+                _positionYInput = ny;
+            },
             (x, y) =>
             {
                 if (_suppressUpdate) return;
@@ -314,8 +355,11 @@ public sealed class InspectorPanel : UserControl
 
         // Rotation
         table.Controls.Add(MakeLabel("Rotation"), 0, 1);
-        table.Controls.Add(MakeFloatControl(
-            obj.Rotation, -360f, 360f,
+        table.Controls.Add(BuildTransformFloatEditor(
+            obj.Rotation,
+            -360f,
+            360f,
+            input => _rotationInput = input,
             v =>
             {
                 if (_suppressUpdate) return;
@@ -324,8 +368,14 @@ public sealed class InspectorPanel : UserControl
 
         // Scale
         table.Controls.Add(MakeLabel("Scale"), 0, 2);
-        table.Controls.Add(MakeVec2Control(
-            obj.Scale.X, obj.Scale.Y,
+        table.Controls.Add(BuildTransformVec2Editor(
+            obj.Scale.X,
+            obj.Scale.Y,
+            (nx, ny) =>
+            {
+                _scaleXInput = nx;
+                _scaleYInput = ny;
+            },
             (x, y) =>
             {
                 if (_suppressUpdate) return;
@@ -334,6 +384,87 @@ public sealed class InspectorPanel : UserControl
 
         grp.Controls.Add(table);
         return grp;
+    }
+
+    private Panel BuildTransformFloatEditor(
+        float value,
+        float min,
+        float max,
+        Action<NumericUpDown> captureInput,
+        Action<float> onChange)
+    {
+        Panel panel = new Panel { Height = RowHeight };
+        NumericUpDown num = CreateNumericUpDown((decimal)value,
+            (decimal)Math.Max(min, (float)decimal.MinValue),
+            (decimal)Math.Min(max, (float)decimal.MaxValue), 3);
+        num.Dock = DockStyle.Fill;
+        num.ValueChanged += (_, _) => onChange((float)num.Value);
+        panel.Controls.Add(num);
+        captureInput(num);
+        return panel;
+    }
+
+    private Panel BuildTransformVec2Editor(
+        float x,
+        float y,
+        Action<NumericUpDown, NumericUpDown> captureInputs,
+        Action<float, float> onChange)
+    {
+        Panel panel = new Panel { Height = RowHeight };
+
+        Label lx = new Label { Text = "X", Width = 14, Dock = DockStyle.Left, TextAlign = System.Drawing.ContentAlignment.MiddleLeft };
+        NumericUpDown nx = CreateNumericUpDown((decimal)x, -1_000_000m, 1_000_000m, 3);
+        nx.Width = NumericWidth;
+        nx.Dock  = DockStyle.Left;
+
+        Label ly = new Label { Text = "Y", Width = 14, Dock = DockStyle.Left, TextAlign = System.Drawing.ContentAlignment.MiddleLeft };
+        NumericUpDown ny = CreateNumericUpDown((decimal)y, -1_000_000m, 1_000_000m, 3);
+        ny.Dock = DockStyle.Fill;
+
+        panel.Controls.Add(ny);
+        panel.Controls.Add(ly);
+        panel.Controls.Add(nx);
+        panel.Controls.Add(lx);
+
+        nx.ValueChanged += (_, _) => onChange((float)nx.Value, (float)ny.Value);
+        ny.ValueChanged += (_, _) => onChange((float)nx.Value, (float)ny.Value);
+
+        captureInputs(nx, ny);
+        return panel;
+    }
+
+    private void UpdateTransformInputsFromCurrentObject()
+    {
+        if (_currentObject is null)
+            return;
+
+        if (_positionXInput is null || _positionYInput is null || _rotationInput is null || _scaleXInput is null || _scaleYInput is null)
+        {
+            RebuildSafe();
+            return;
+        }
+
+        bool previousSuppress = _suppressUpdate;
+        _suppressUpdate = true;
+        try
+        {
+            SetNumericValue(_positionXInput, _currentObject.Position.X);
+            SetNumericValue(_positionYInput, _currentObject.Position.Y);
+            SetNumericValue(_rotationInput, _currentObject.Rotation);
+            SetNumericValue(_scaleXInput, _currentObject.Scale.X);
+            SetNumericValue(_scaleYInput, _currentObject.Scale.Y);
+        }
+        finally
+        {
+            _suppressUpdate = previousSuppress;
+        }
+    }
+
+    private static void SetNumericValue(NumericUpDown input, float value)
+    {
+        decimal next = Math.Clamp((decimal)value, input.Minimum, input.Maximum);
+        if (input.Value != next)
+            input.Value = next;
     }
 
     #endregion
@@ -515,7 +646,7 @@ public sealed class InspectorPanel : UserControl
         PropertyInfo prop,
         EditorPropertyAttribute? attr,
         EditorBehaviour behaviour,
-        EditorGameObject owner)
+        EditorGameObject _)
     {
         Type pType = prop.PropertyType;
 

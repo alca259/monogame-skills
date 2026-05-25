@@ -5,6 +5,12 @@ namespace MonoGame.Editor.WinForms;
 /// <summary>Main editor window. Logic and event wiring.</summary>
 public sealed partial class EditorForm : Form
 {
+    private enum SceneViewMode
+    {
+        TwoD,
+        ThreeD,
+    }
+
     private readonly EditorContext _context = null!;
     private readonly EditorPreferences _preferences = null!;
     private readonly GameObjectRegistry _registry = null!;
@@ -20,6 +26,7 @@ public sealed partial class EditorForm : Form
     private ToolStripMenuItem        _openRecentMenuItem  = null!;
     private ProjectSettings?         _projectSettings;
     private readonly ICodeGenService _codeGenService = new SceneCodeGenerator();
+    private SceneViewMode _sceneViewMode = SceneViewMode.TwoD;
 
     /// <summary>Designer-only constructor.</summary>
     public EditorForm() => InitializeComponent();
@@ -352,6 +359,19 @@ public sealed partial class EditorForm : Form
         _moveModeButton.Checked   = mode == GizmoMode.Move;
         _rotateModeButton.Checked = mode == GizmoMode.Rotate;
         _scaleModeButton.Checked  = mode == GizmoMode.Scale;
+    }
+
+    private void OnSceneViewModeClick(object? sender, EventArgs e)
+    {
+        _sceneViewMode = _sceneViewMode == SceneViewMode.TwoD
+            ? SceneViewMode.ThreeD
+            : SceneViewMode.TwoD;
+
+        _sceneViewModeButton.Text = _sceneViewMode == SceneViewMode.TwoD
+            ? "View: 2D"
+            : "View: 3D";
+
+        _viewport.Invalidate();
     }
 
     private void OnFormClosing(object? sender, FormClosingEventArgs e)
@@ -1276,7 +1296,41 @@ public sealed partial class EditorForm : Form
         RebuildOpenRecentsMenu();
 
         if (evt.Project is not null)
+        {
+            RefreshBehaviourRegistryAsync(evt.Project);
             _ = LoadProjectSettingsAsync(evt.Project);
+        }
+    }
+
+    private void RefreshBehaviourRegistryAsync(EditorProject project)
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                _registry.Scan();
+
+                if (!string.IsNullOrWhiteSpace(project.GameCsprojPath))
+                {
+                    string dllPath = Path.Combine(
+                        Path.GetDirectoryName(project.GameCsprojPath) ?? project.RootPath,
+                        "bin",
+                        "Debug",
+                        "net10.0",
+                        $"{Path.GetFileNameWithoutExtension(project.GameCsprojPath)}.dll");
+
+                    if (File.Exists(dllPath))
+                        await _registry.ScanFromAssemblyAsync(dllPath).ConfigureAwait(false);
+                }
+
+                if (!string.IsNullOrWhiteSpace(project.GameSourcePath) && Directory.Exists(project.GameSourcePath))
+                    await _registry.ScanSourceAsync(project.GameSourcePath).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                BeginInvoke(() => _consolePanel.AppendLine($"[Registry] Refresh failed: {ex.Message}"));
+            }
+        });
     }
 
     private async Task LoadProjectSettingsAsync(EditorProject project)
@@ -1373,14 +1427,65 @@ public sealed partial class EditorForm : Form
         Viewport vp = new(0, 0, w, h);
         Matrix cameraTransform = _viewport.Camera.GetTransformMatrix(vp);
 
-        // Render edit-mode sprite previews before gizmo overlays.
-        _editRenderer ??= new EditModeRenderer(_context);
-        if (!_editRenderer.IsInitialized)
-            _editRenderer.Initialize(e.GraphicsDevice);
-        if (_context.ActiveScene is not null)
-            _editRenderer.DrawScene(_context.ActiveScene, cameraTransform);
+        if (_sceneViewMode == SceneViewMode.TwoD)
+        {
+            // Render edit-mode sprite previews before gizmo overlays.
+            _editRenderer ??= new EditModeRenderer(_context);
+            if (!_editRenderer.IsInitialized)
+                _editRenderer.Initialize(e.GraphicsDevice);
+            if (_context.ActiveScene is not null)
+                _editRenderer.DrawScene(_context.ActiveScene, cameraTransform);
+        }
+        else
+        {
+            DrawScenePerspectivePreview(e.GraphicsDevice, w, h);
+        }
 
         _gizmoRenderer.Draw(_context.SelectedObject, cameraTransform, w, h);
+    }
+
+    private void DrawScenePerspectivePreview(GraphicsDevice gd, int width, int height)
+    {
+        if (width <= 0 || height <= 0)
+            return;
+
+        gd.DepthStencilState = DepthStencilState.Default;
+        gd.RasterizerState = RasterizerState.CullNone;
+
+        VertexPositionColor[] vertices =
+        [
+            // X axis
+            new VertexPositionColor(new Vector3(-200f, 0f, 0f), new Microsoft.Xna.Framework.Color(140, 40, 40)),
+            new VertexPositionColor(new Vector3( 200f, 0f, 0f), new Microsoft.Xna.Framework.Color(240, 90, 90)),
+            // Y axis
+            new VertexPositionColor(new Vector3(0f, -200f, 0f), new Microsoft.Xna.Framework.Color(40, 140, 40)),
+            new VertexPositionColor(new Vector3(0f,  200f, 0f), new Microsoft.Xna.Framework.Color(90, 240, 90)),
+            // Z axis
+            new VertexPositionColor(new Vector3(0f, 0f, -200f), new Microsoft.Xna.Framework.Color(40, 90, 170)),
+            new VertexPositionColor(new Vector3(0f, 0f,  200f), new Microsoft.Xna.Framework.Color(90, 170, 255)),
+        ];
+
+        Matrix world = Matrix.Identity;
+        Matrix view = Matrix.CreateLookAt(new Vector3(180f, 180f, 180f), Vector3.Zero, Vector3.Up);
+        Matrix projection = Matrix.CreatePerspectiveFieldOfView(
+            MathHelper.PiOver4,
+            width / (float)height,
+            0.1f,
+            5000f);
+
+        using BasicEffect effect = new(gd)
+        {
+            VertexColorEnabled = true,
+            World = world,
+            View = view,
+            Projection = projection,
+        };
+
+        foreach (EffectPass pass in effect.CurrentTechnique.Passes)
+        {
+            pass.Apply();
+            gd.DrawUserPrimitives(PrimitiveType.LineList, vertices, 0, 3);
+        }
     }
 
     #endregion
@@ -1436,6 +1541,8 @@ public sealed partial class EditorForm : Form
             e.X, e.Y,
             objScreen.X, objScreen.Y,
             selected);
+
+        _context.EventBus.Publish(new GameObjectTransformChangedEvent(selected));
     }
 
     private void OnViewportMouseUp(object? sender, MouseEventArgs e)
