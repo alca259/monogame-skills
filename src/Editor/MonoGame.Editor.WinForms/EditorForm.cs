@@ -27,6 +27,8 @@ public sealed partial class EditorForm : Form
     private ProjectSettings?         _projectSettings;
     private readonly ICodeGenService _codeGenService = new SceneCodeGenerator();
     private SceneViewMode _sceneViewMode = SceneViewMode.TwoD;
+    private bool _handToolEnabled;
+    private readonly HashSet<Keys> _pressedNavigationKeys = [];
 
     /// <summary>Designer-only constructor.</summary>
     public EditorForm() => InitializeComponent();
@@ -187,10 +189,23 @@ public sealed partial class EditorForm : Form
                 case Keys.W: SetGizmoMode(GizmoMode.Move);   e.Handled = true; break;
                 case Keys.E: SetGizmoMode(GizmoMode.Rotate); e.Handled = true; break;
                 case Keys.R: SetGizmoMode(GizmoMode.Scale);  e.Handled = true; break;
+                case Keys.H: ToggleHandTool();               e.Handled = true; break;
                 case Keys.G: _gizmoCtrl.ShowGrid = !_gizmoCtrl.ShowGrid; e.Handled = true; break;
             }
         }
+
+        if (IsNavigationKey(e.KeyCode))
+            _pressedNavigationKeys.Add(e.KeyCode);
     }
+
+    protected override void OnKeyUp(KeyEventArgs e)
+    {
+        base.OnKeyUp(e);
+        _pressedNavigationKeys.Remove(e.KeyCode);
+    }
+
+    private static bool IsNavigationKey(Keys key)
+        => key is Keys.W or Keys.A or Keys.S or Keys.D or Keys.ShiftKey;
 
     #endregion
 
@@ -359,6 +374,19 @@ public sealed partial class EditorForm : Form
         _moveModeButton.Checked   = mode == GizmoMode.Move;
         _rotateModeButton.Checked = mode == GizmoMode.Rotate;
         _scaleModeButton.Checked  = mode == GizmoMode.Scale;
+
+        if (_handToolEnabled)
+            ToggleHandTool(false);
+    }
+
+    private void OnHandModeClick(object? sender, EventArgs e) => ToggleHandTool();
+
+    private void ToggleHandTool(bool? force = null)
+    {
+        bool next = force ?? !_handToolEnabled;
+        _handToolEnabled = next;
+        _handModeButton.Checked = next;
+        _viewport.HandToolEnabled = next;
     }
 
     private void OnSceneViewModeClick(object? sender, EventArgs e)
@@ -1392,9 +1420,35 @@ public sealed partial class EditorForm : Form
 
     private void OnViewportRenderFrame(object? sender, RenderEventArgs e)
     {
+        ApplyKeyboardNavigation(e.Elapsed);
+
         // Scene tab always renders the edit-mode overlay (grid, gizmos, sprite previews)
         // regardless of play state — mirrors the Unity Scene view behaviour.
         DrawEditorGizmos(e);
+    }
+
+    private void ApplyKeyboardNavigation(TimeSpan elapsed)
+    {
+        if (_pressedNavigationKeys.Count == 0)
+            return;
+
+        float dt = (float)elapsed.TotalSeconds;
+        if (dt <= 0f)
+            return;
+
+        float speed = _pressedNavigationKeys.Contains(Keys.ShiftKey) ? 1200f : 450f;
+        Vector2 delta = Vector2.Zero;
+
+        if (_pressedNavigationKeys.Contains(Keys.W)) delta.Y -= 1f;
+        if (_pressedNavigationKeys.Contains(Keys.S)) delta.Y += 1f;
+        if (_pressedNavigationKeys.Contains(Keys.A)) delta.X -= 1f;
+        if (_pressedNavigationKeys.Contains(Keys.D)) delta.X += 1f;
+
+        if (delta == Vector2.Zero)
+            return;
+
+        delta.Normalize();
+        _viewport.Camera.Pan(delta * speed * dt / _viewport.Camera.Zoom);
     }
 
     private void OnGameViewportRenderFrame(object? sender, RenderEventArgs e)
@@ -1494,6 +1548,9 @@ public sealed partial class EditorForm : Form
 
     private void OnViewportMouseDown(object? sender, MouseEventArgs e)
     {
+        if (_handToolEnabled)
+            return;
+
         if (e.Button != MouseButtons.Left) return;
 
         EditorGameObject? selected = _context.SelectedObject;
@@ -1521,6 +1578,9 @@ public sealed partial class EditorForm : Form
 
     private void OnViewportMouseMove(object? sender, MouseEventArgs e)
     {
+        if (_handToolEnabled)
+            return;
+
         EditorGameObject? selected = _context.SelectedObject;
         if (selected == null) return;
 
@@ -1547,6 +1607,9 @@ public sealed partial class EditorForm : Form
 
     private void OnViewportMouseUp(object? sender, MouseEventArgs e)
     {
+        if (_handToolEnabled)
+            return;
+
         if (e.Button != MouseButtons.Left) return;
 
         bool ctrlHeld         = ModifierKeys.HasFlag(Keys.Control);

@@ -37,6 +37,7 @@ public sealed class MonoGameControl : Control
 
     // Camera input state (written on UI thread, read on render thread — floats are atomic)
     private bool _panActive;
+    private bool _handToolActive;
     private System.Drawing.Point _lastPanPos;
 
     /// <summary>Editor camera used to transform the viewport.</summary>
@@ -57,6 +58,15 @@ public sealed class MonoGameControl : Control
     /// Subscribers can draw content using the provided <see cref="GraphicsDevice"/>.
     /// </summary>
     public event EventHandler<RenderEventArgs>? RenderFrame;
+
+    /// <summary>When true, left mouse drag pans the scene like a hand tool.</summary>
+    [System.ComponentModel.Browsable(false)]
+    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+    public bool HandToolEnabled
+    {
+        get => _handToolActive;
+        set => _handToolActive = value;
+    }
 
     public MonoGameControl()
     {
@@ -117,7 +127,7 @@ public sealed class MonoGameControl : Control
     protected override void OnMouseDown(MouseEventArgs e)
     {
         base.OnMouseDown(e);
-        if (e.Button == MouseButtons.Middle)
+        if (e.Button == MouseButtons.Middle || (_handToolActive && e.Button == MouseButtons.Left))
         {
             _panActive = true;
             _lastPanPos = e.Location;
@@ -141,7 +151,7 @@ public sealed class MonoGameControl : Control
     protected override void OnMouseUp(MouseEventArgs e)
     {
         base.OnMouseUp(e);
-        if (e.Button == MouseButtons.Middle)
+        if (e.Button == MouseButtons.Middle || (_handToolActive && e.Button == MouseButtons.Left))
             _panActive = false;
     }
 

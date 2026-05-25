@@ -34,6 +34,7 @@ partial class EditorForm
     private ToolStripButton _moveModeButton = null!;
     private ToolStripButton _rotateModeButton = null!;
     private ToolStripButton _scaleModeButton = null!;
+    private ToolStripButton _handModeButton = null!;
     private ToolStripSeparator _gizmoSeparator = null!;
     private ToolStripButton _sceneViewModeButton = null!;
     private Panel _playbackCell = null!;
@@ -114,6 +115,7 @@ partial class EditorForm
         _moveModeButton           = new ToolStripButton();
         _rotateModeButton         = new ToolStripButton();
         _scaleModeButton          = new ToolStripButton();
+        _handModeButton           = new ToolStripButton();
         _gizmoSeparator           = new ToolStripSeparator();
         _sceneViewModeButton      = new ToolStripButton();
         _playbackCell             = new Panel();
@@ -327,7 +329,7 @@ partial class EditorForm
         // _gizmoStrip — horizontal, auto-sizes to button content
         _gizmoStrip.AutoSize = true;
         _gizmoStrip.GripStyle = ToolStripGripStyle.Hidden;
-        _gizmoStrip.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { _selectModeButton, _moveModeButton, _rotateModeButton, _scaleModeButton, _gizmoSeparator, _sceneViewModeButton });
+        _gizmoStrip.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { _selectModeButton, _moveModeButton, _rotateModeButton, _scaleModeButton, _handModeButton, _gizmoSeparator, _sceneViewModeButton });
         _gizmoStrip.LayoutStyle = ToolStripLayoutStyle.HorizontalStackWithOverflow;
         _gizmoStrip.Location = new System.Drawing.Point(0, 0);
         _gizmoStrip.Name = "_gizmoStrip";
@@ -371,6 +373,15 @@ partial class EditorForm
         _scaleModeButton.Text = "R Scale";
         _scaleModeButton.ToolTipText = "Scale (R)";
         _scaleModeButton.Click += OnGizmoModeClick;
+
+        // _handModeButton
+        _handModeButton.CheckOnClick = true;
+        _handModeButton.DisplayStyle = ToolStripItemDisplayStyle.Text;
+        _handModeButton.Name = "_handModeButton";
+        _handModeButton.Size = new System.Drawing.Size(44, 22);
+        _handModeButton.Text = "H Hand";
+        _handModeButton.ToolTipText = "Hand tool (H)";
+        _handModeButton.Click += OnHandModeClick;
 
         // _gizmoSeparator
         _gizmoSeparator.Name = "_gizmoSeparator";

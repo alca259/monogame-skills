@@ -338,10 +338,10 @@ public sealed class InspectorPanel : UserControl
         table.RowStyles.Add(new RowStyle(SizeType.Absolute, RowHeight));
 
         // Position
-        table.Controls.Add(MakeLabel("Position"), 0, 0);
+        table.Controls.Add(MakeLabel("Local Position"), 0, 0);
         table.Controls.Add(BuildTransformVec2Editor(
-            obj.Position.X,
-            obj.Position.Y,
+            obj.LocalPosition.X,
+            obj.LocalPosition.Y,
             (nx, ny) =>
             {
                 _positionXInput = nx;
@@ -350,27 +350,29 @@ public sealed class InspectorPanel : UserControl
             (x, y) =>
             {
                 if (_suppressUpdate) return;
-                _context!.Commands.Execute(new MoveEntityCommand(obj, new EditorVector2(x, y)));
+                _context!.Commands.Execute(new MoveEntityCommand(obj, obj.Position, obj.Parent is null
+                    ? new EditorVector2(x, y)
+                    : new EditorVector2(obj.Parent.Position.X + x, obj.Parent.Position.Y + y)));
             }), 1, 0);
 
         // Rotation
-        table.Controls.Add(MakeLabel("Rotation"), 0, 1);
+        table.Controls.Add(MakeLabel("Local Rotation"), 0, 1);
         table.Controls.Add(BuildTransformFloatEditor(
-            obj.Rotation,
+            obj.LocalRotation,
             -360f,
             360f,
             input => _rotationInput = input,
             v =>
             {
                 if (_suppressUpdate) return;
-                _context!.Commands.Execute(new RotateEntityCommand(obj, v));
+                _context!.Commands.Execute(new RotateEntityCommand(obj, obj.Rotation, obj.Parent is null ? v : obj.Parent.Rotation + v));
             }), 1, 1);
 
         // Scale
-        table.Controls.Add(MakeLabel("Scale"), 0, 2);
+        table.Controls.Add(MakeLabel("Local Scale"), 0, 2);
         table.Controls.Add(BuildTransformVec2Editor(
-            obj.Scale.X,
-            obj.Scale.Y,
+            obj.LocalScale.X,
+            obj.LocalScale.Y,
             (nx, ny) =>
             {
                 _scaleXInput = nx;
@@ -379,7 +381,9 @@ public sealed class InspectorPanel : UserControl
             (x, y) =>
             {
                 if (_suppressUpdate) return;
-                _context!.Commands.Execute(new ScaleEntityCommand(obj, new EditorVector2(x, y)));
+                _context!.Commands.Execute(new ScaleEntityCommand(obj, obj.Scale, obj.Parent is null
+                    ? new EditorVector2(x, y)
+                    : new EditorVector2(obj.Parent.Scale.X * x, obj.Parent.Scale.Y * y)));
             }), 1, 2);
 
         grp.Controls.Add(table);
@@ -448,11 +452,11 @@ public sealed class InspectorPanel : UserControl
         _suppressUpdate = true;
         try
         {
-            SetNumericValue(_positionXInput, _currentObject.Position.X);
-            SetNumericValue(_positionYInput, _currentObject.Position.Y);
-            SetNumericValue(_rotationInput, _currentObject.Rotation);
-            SetNumericValue(_scaleXInput, _currentObject.Scale.X);
-            SetNumericValue(_scaleYInput, _currentObject.Scale.Y);
+            SetNumericValue(_positionXInput, _currentObject.LocalPosition.X);
+            SetNumericValue(_positionYInput, _currentObject.LocalPosition.Y);
+            SetNumericValue(_rotationInput, _currentObject.LocalRotation);
+            SetNumericValue(_scaleXInput, _currentObject.LocalScale.X);
+            SetNumericValue(_scaleYInput, _currentObject.LocalScale.Y);
         }
         finally
         {
@@ -619,11 +623,24 @@ public sealed class InspectorPanel : UserControl
 
             // If this type has no [EditorProperty] at all (e.g. Kernel library types),
             // fall back to showing all public read-write properties of supported types.
-            bool include = attr is not null
+        bool include = attr is not null
                 || (!hasAnyAttribute && prop.CanRead && prop.CanWrite
                     && IsSupportedFallbackType(prop.PropertyType));
 
             if (!include) continue;
+
+            // Hide runtime-local internals and world aliases in TransformBehaviour fallback view.
+            if (string.Equals(type.Name, "TransformBehaviour", StringComparison.Ordinal)
+                && (prop.Name.StartsWith("Local", StringComparison.Ordinal)
+                    || string.Equals(prop.Name, "LocalToWorldMatrix", StringComparison.Ordinal)
+                    || string.Equals(prop.Name, "WorldToLocalMatrix", StringComparison.Ordinal)
+                    || string.Equals(prop.Name, "ParentTransform", StringComparison.Ordinal)
+                    || string.Equals(prop.Name, "Root", StringComparison.Ordinal)
+                    || string.Equals(prop.Name, "ChildCount", StringComparison.Ordinal)
+                    || string.Equals(prop.Name, "Enabled", StringComparison.Ordinal)))
+            {
+                continue;
+            }
 
             string label = attr?.Label ?? prop.Name;
             Control ctrl = CreateControlForProperty(prop, attr, behaviour, owner);
