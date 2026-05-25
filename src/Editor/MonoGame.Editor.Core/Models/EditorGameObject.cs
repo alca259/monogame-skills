@@ -36,4 +36,7 @@ public sealed class EditorGameObject
     /// or <c>null</c> if this is a plain game object.
     /// </summary>
     public string? PrefabPath { get; set; }
+
+    /// <summary>User-defined tags. Serialized with the scene.</summary>
+    public List<string> Tags { get; } = [];
 }

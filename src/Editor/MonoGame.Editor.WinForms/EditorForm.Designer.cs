@@ -58,8 +58,20 @@ partial class EditorForm
     private TabControl _bottomTabControl = null!;
     private TabPage _assetsTab = null!;
     private TabPage _consoleTab = null!;
+    private TabPage _sceneManagerTab = null!;
     private AssetBrowserPanel _assetBrowserPanel = null!;
     private ConsolePanel _consolePanel = null!;
+    private SceneManagerPanel _sceneManagerPanel = null!;
+    private TabPage _localizationTab = null!;
+    private LocalizationBrowserPanel _localizationPanel = null!;
+    private TabPage _inputMapEditorTab = null!;
+    private InputMapEditorPanel _inputMapEditorPanel = null!;
+
+    // ── View menu ─────────────────────────────────────────────────────────
+    // (declared alongside _viewSceneManagerMenuItem below in field declarations)
+    private ToolStripMenuItem _viewSceneManagerMenuItem = null!;
+    private ToolStripMenuItem _viewLocalizationMenuItem = null!;
+    private ToolStripMenuItem _viewInputMapEditorMenuItem = null!;
 
     protected override void Dispose(bool disposing)
     {
@@ -114,6 +126,15 @@ partial class EditorForm
         _assetBrowserPanel        = new AssetBrowserPanel();
         _consoleTab               = new TabPage();
         _consolePanel             = new ConsolePanel();
+        _sceneManagerTab          = new TabPage();
+        _sceneManagerPanel        = new SceneManagerPanel();
+        _localizationTab          = new TabPage();
+        _localizationPanel        = new LocalizationBrowserPanel();
+        _inputMapEditorTab        = new TabPage();
+        _inputMapEditorPanel      = new InputMapEditorPanel();
+        _viewSceneManagerMenuItem = new ToolStripMenuItem();
+        _viewLocalizationMenuItem = new ToolStripMenuItem();
+        _viewInputMapEditorMenuItem = new ToolStripMenuItem();
 
         _toolbarTable.SuspendLayout();
         _playbackCell.SuspendLayout();
@@ -131,6 +152,9 @@ partial class EditorForm
         _innerSplit.SuspendLayout();
         _assetsTab.SuspendLayout();
         _consoleTab.SuspendLayout();
+        _sceneManagerTab.SuspendLayout();
+        _localizationTab.SuspendLayout();
+        _inputMapEditorTab.SuspendLayout();
         SuspendLayout();
 
         // _mainMenuStrip
@@ -198,7 +222,7 @@ partial class EditorForm
         _editSeparator1.Size = new System.Drawing.Size(177, 6);
 
         // _viewMenu
-        _viewMenu.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { _viewHierarchyMenuItem, _viewInspectorMenuItem, _viewAssetBrowserMenuItem, _viewConsoleMenuItem, _viewMenuSeparator1, _resetLayoutMenuItem });
+        _viewMenu.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { _viewHierarchyMenuItem, _viewInspectorMenuItem, _viewAssetBrowserMenuItem, _viewConsoleMenuItem, _viewSceneManagerMenuItem, _viewLocalizationMenuItem, _viewInputMapEditorMenuItem, _viewMenuSeparator1, _resetLayoutMenuItem });
         _viewMenu.Name = "_viewMenu";
         _viewMenu.Size = new System.Drawing.Size(44, 20);
         _viewMenu.Text = "View";
@@ -238,6 +262,33 @@ partial class EditorForm
         _viewConsoleMenuItem.Size = new System.Drawing.Size(163, 22);
         _viewConsoleMenuItem.Text = "Console";
         _viewConsoleMenuItem.Click += OnViewMenuItemClick;
+
+        // _viewSceneManagerMenuItem
+        _viewSceneManagerMenuItem.CheckOnClick = true;
+        _viewSceneManagerMenuItem.Checked = true;
+        _viewSceneManagerMenuItem.CheckState = CheckState.Checked;
+        _viewSceneManagerMenuItem.Name = "_viewSceneManagerMenuItem";
+        _viewSceneManagerMenuItem.Size = new System.Drawing.Size(163, 22);
+        _viewSceneManagerMenuItem.Text = "Scene Manager";
+        _viewSceneManagerMenuItem.Click += OnViewMenuItemClick;
+
+        // _viewLocalizationMenuItem
+        _viewLocalizationMenuItem.CheckOnClick = true;
+        _viewLocalizationMenuItem.Checked = false;
+        _viewLocalizationMenuItem.CheckState = CheckState.Unchecked;
+        _viewLocalizationMenuItem.Name = "_viewLocalizationMenuItem";
+        _viewLocalizationMenuItem.Size = new System.Drawing.Size(163, 22);
+        _viewLocalizationMenuItem.Text = "Localization";
+        _viewLocalizationMenuItem.Click += OnViewMenuItemClick;
+
+        // _viewInputMapEditorMenuItem
+        _viewInputMapEditorMenuItem.CheckOnClick = true;
+        _viewInputMapEditorMenuItem.Checked = false;
+        _viewInputMapEditorMenuItem.CheckState = CheckState.Unchecked;
+        _viewInputMapEditorMenuItem.Name = "_viewInputMapEditorMenuItem";
+        _viewInputMapEditorMenuItem.Size = new System.Drawing.Size(163, 22);
+        _viewInputMapEditorMenuItem.Text = "Input Map Editor";
+        _viewInputMapEditorMenuItem.Click += OnViewMenuItemClick;
 
         // _viewMenuSeparator1
         _viewMenuSeparator1.Name = "_viewMenuSeparator1";
@@ -454,9 +505,60 @@ partial class EditorForm
         _consoleTab.TabIndex = 1;
         _consoleTab.Text = "Console";
 
+        // _sceneManagerPanel
+        _sceneManagerPanel.Dock = DockStyle.Fill;
+        _sceneManagerPanel.Location = new System.Drawing.Point(0, 0);
+        _sceneManagerPanel.Name = "_sceneManagerPanel";
+        _sceneManagerPanel.Size = new System.Drawing.Size(1280, 172);
+        _sceneManagerPanel.TabIndex = 0;
+
+        // _sceneManagerTab
+        _sceneManagerTab.Controls.Add(_sceneManagerPanel);
+        _sceneManagerTab.Location = new System.Drawing.Point(4, 24);
+        _sceneManagerTab.Name = "_sceneManagerTab";
+        _sceneManagerTab.Padding = new System.Windows.Forms.Padding(0);
+        _sceneManagerTab.Size = new System.Drawing.Size(1280, 172);
+        _sceneManagerTab.TabIndex = 2;
+        _sceneManagerTab.Text = "Scenes";
+
+        // _localizationPanel
+        _localizationPanel.Dock = DockStyle.Fill;
+        _localizationPanel.Location = new System.Drawing.Point(0, 0);
+        _localizationPanel.Name = "_localizationPanel";
+        _localizationPanel.Size = new System.Drawing.Size(1280, 172);
+        _localizationPanel.TabIndex = 0;
+
+        // _localizationTab
+        _localizationTab.Controls.Add(_localizationPanel);
+        _localizationTab.Location = new System.Drawing.Point(4, 24);
+        _localizationTab.Name = "_localizationTab";
+        _localizationTab.Padding = new System.Windows.Forms.Padding(0);
+        _localizationTab.Size = new System.Drawing.Size(1280, 172);
+        _localizationTab.TabIndex = 3;
+        _localizationTab.Text = "Localization";
+
+        // _inputMapEditorPanel
+        _inputMapEditorPanel.Dock = DockStyle.Fill;
+        _inputMapEditorPanel.Location = new System.Drawing.Point(0, 0);
+        _inputMapEditorPanel.Name = "_inputMapEditorPanel";
+        _inputMapEditorPanel.Size = new System.Drawing.Size(1280, 172);
+        _inputMapEditorPanel.TabIndex = 0;
+
+        // _inputMapEditorTab
+        _inputMapEditorTab.Controls.Add(_inputMapEditorPanel);
+        _inputMapEditorTab.Location = new System.Drawing.Point(4, 24);
+        _inputMapEditorTab.Name = "_inputMapEditorTab";
+        _inputMapEditorTab.Padding = new System.Windows.Forms.Padding(0);
+        _inputMapEditorTab.Size = new System.Drawing.Size(1280, 172);
+        _inputMapEditorTab.TabIndex = 4;
+        _inputMapEditorTab.Text = "Input Maps";
+
         // _bottomTabControl
         _bottomTabControl.Controls.Add(_assetsTab);
         _bottomTabControl.Controls.Add(_consoleTab);
+        _bottomTabControl.Controls.Add(_sceneManagerTab);
+        _bottomTabControl.Controls.Add(_localizationTab);
+        _bottomTabControl.Controls.Add(_inputMapEditorTab);
         _bottomTabControl.Dock = DockStyle.Fill;
         _bottomTabControl.Location = new System.Drawing.Point(0, 0);
         _bottomTabControl.Name = "_bottomTabControl";
@@ -508,6 +610,9 @@ partial class EditorForm
         _innerSplit.ResumeLayout(false);
         _assetsTab.ResumeLayout(false);
         _consoleTab.ResumeLayout(false);
+        _sceneManagerTab.ResumeLayout(false);
+        _localizationTab.ResumeLayout(false);
+        _inputMapEditorTab.ResumeLayout(false);
         ResumeLayout(false);
         PerformLayout();
     }

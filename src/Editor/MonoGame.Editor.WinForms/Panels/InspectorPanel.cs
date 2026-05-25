@@ -15,6 +15,7 @@ public sealed class InspectorPanel : UserControl
     private const int SectionGap   = 6;
     private const int SidePadding  = 6;
     private const int NumericWidth = 68;
+    private const int HeaderHeight = 56;
 
     #endregion
 
@@ -23,6 +24,7 @@ public sealed class InspectorPanel : UserControl
     private EditorContext?      _context;
     private GameObjectRegistry? _registry;
     private PrefabManager?      _prefabManager;
+    private EditorPreferences?  _preferences;
     private EditorGameObject?   _currentObject;
     private bool                _suppressUpdate;
 
@@ -52,11 +54,12 @@ public sealed class InspectorPanel : UserControl
     #region Initialization
 
     /// <summary>Connects this panel to the editor context and behaviour registry.</summary>
-    public void Initialize(EditorContext context, GameObjectRegistry? registry = null, PrefabManager? prefabManager = null)
+    public void Initialize(EditorContext context, GameObjectRegistry? registry = null, PrefabManager? prefabManager = null, EditorPreferences? preferences = null)
     {
         _context       = context;
         _registry      = registry;
         _prefabManager = prefabManager;
+        _preferences   = preferences;
 
         _onUndo = _ => RebuildSafe();
         _onRedo = _ => RebuildSafe();
@@ -129,6 +132,13 @@ public sealed class InspectorPanel : UserControl
         int y     = SidePadding;
         int width = ContentWidth();
 
+        // Entity header
+        Control entityHeader = BuildEntityHeader(_currentObject);
+        entityHeader.Location = new System.Drawing.Point(SidePadding, y);
+        entityHeader.Width    = width;
+        _scrollPanel.Controls.Add(entityHeader);
+        y += entityHeader.Height + SectionGap;
+
         // Prefab header (only when the object is a prefab instance)
         if (_currentObject.PrefabPath is not null && _prefabManager is not null)
         {
@@ -158,15 +168,20 @@ public sealed class InspectorPanel : UserControl
         }
 
         // Add Behaviour button
+        Panel addPanel = new Panel { Height = 36, Location = new System.Drawing.Point(SidePadding, y) };
         Button addBtn = new Button
         {
-            Text     = "+ Add Behaviour",
-            Height   = 28,
-            Location = new System.Drawing.Point(SidePadding, y),
-            Width    = width,
+            Text      = "+ Add Behaviour",
+            Height    = 28,
+            Dock      = DockStyle.Fill,
+            FlatStyle = FlatStyle.Flat,
+            Padding   = new System.Windows.Forms.Padding(4, 2, 4, 2),
         };
+        addBtn.FlatAppearance.BorderColor = System.Drawing.SystemColors.ControlDark;
         addBtn.Click += OnAddBehaviourClick;
-        _scrollPanel.Controls.Add(addBtn);
+        addPanel.Controls.Add(addBtn);
+        addPanel.Width = width;
+        _scrollPanel.Controls.Add(addPanel);
 
         _scrollPanel.ResumeLayout();
         _suppressUpdate = false;
@@ -174,6 +189,92 @@ public sealed class InspectorPanel : UserControl
 
     private int ContentWidth() =>
         Math.Max(0, _scrollPanel.ClientSize.Width - SidePadding * 2 - SystemInformation.VerticalScrollBarWidth);
+
+    #endregion
+
+    #region Entity header
+
+    private Control BuildEntityHeader(EditorGameObject obj)
+    {
+        Panel panel = new Panel
+        {
+            Height    = HeaderHeight,
+            BackColor = System.Drawing.SystemColors.ControlDarkDark,
+            Padding   = new System.Windows.Forms.Padding(4, 2, 4, 2),
+        };
+
+        // Id label (Dock=Bottom)
+        Label idLabel = new Label
+        {
+            Dock      = DockStyle.Bottom,
+            Height    = 16,
+            Text      = obj.Id.ToString()[..8],
+            Font      = new System.Drawing.Font("Segoe UI", 7f),
+            ForeColor = System.Drawing.SystemColors.GrayText,
+            TextAlign = System.Drawing.ContentAlignment.MiddleLeft,
+        };
+
+        // Active checkbox (Dock=Left)
+        CheckBox activeChk = new CheckBox
+        {
+            Dock    = DockStyle.Left,
+            Width   = 18,
+            Checked = obj.Active,
+        };
+        activeChk.CheckedChanged += (_, _) =>
+        {
+            if (_suppressUpdate) return;
+            _context!.Commands.Execute(new SetPropertyCommand<bool>(
+                "Set Active", obj.Active, activeChk.Checked, v => obj.Active = v));
+        };
+
+        // Tags combobox (Dock=Right)
+        ComboBox tagsCombo = new ComboBox
+        {
+            Dock          = DockStyle.Right,
+            Width         = 90,
+            DropDownStyle = ComboBoxStyle.DropDown,
+        };
+        tagsCombo.Text = "Add tag...";
+        for (int i = 0; i < obj.Tags.Count; i++)
+            tagsCombo.Items.Add(obj.Tags[i]);
+        tagsCombo.KeyDown += (_, ev) =>
+        {
+            if (ev.KeyCode != Keys.Enter) return;
+            string tag = tagsCombo.Text.Trim();
+            if (string.IsNullOrEmpty(tag) || obj.Tags.Contains(tag)) return;
+            List<string> newTags = [.. obj.Tags, tag];
+            _context!.Commands.Execute(new SetTagsCommand(obj, newTags));
+            tagsCombo.Items.Clear();
+            for (int i = 0; i < obj.Tags.Count; i++) tagsCombo.Items.Add(obj.Tags[i]);
+            tagsCombo.Text = string.Empty;
+            ev.Handled = true;
+            ev.SuppressKeyPress = true;
+        };
+
+        // Entity name textbox (Dock=Fill)
+        TextBox nameBox = new TextBox
+        {
+            Dock      = DockStyle.Fill,
+            Text      = obj.Name,
+            Font      = new System.Drawing.Font("Segoe UI", 10f, System.Drawing.FontStyle.Bold),
+            BackColor = System.Drawing.SystemColors.ControlDarkDark,
+            ForeColor = System.Drawing.SystemColors.ControlText,
+            BorderStyle = BorderStyle.None,
+        };
+        nameBox.Leave += (_, _) =>
+        {
+            string newName = nameBox.Text.Trim();
+            if (string.IsNullOrEmpty(newName) || newName == obj.Name) return;
+            _context!.Commands.Execute(new RenameEntityCommand(obj, newName));
+        };
+
+        panel.Controls.Add(idLabel);
+        panel.Controls.Add(tagsCombo);
+        panel.Controls.Add(nameBox);
+        panel.Controls.Add(activeChk);
+        return panel;
+    }
 
     #endregion
 
@@ -242,6 +343,7 @@ public sealed class InspectorPanel : UserControl
     private Control BuildBehaviourSection(EditorBehaviour behaviour, EditorGameObject owner)
     {
         string shortName = ExtractShortName(behaviour.TypeName);
+        bool collapsed   = _preferences?.BehaviourSectionCollapsed.GetValueOrDefault(shortName, false) ?? false;
 
         // Outer panel that stacks header + body
         Panel outerPanel = new Panel { Padding = new System.Windows.Forms.Padding(0) };
@@ -255,12 +357,21 @@ public sealed class InspectorPanel : UserControl
             Padding   = new System.Windows.Forms.Padding(2),
         };
 
+        Label chevron = new Label
+        {
+            Text      = collapsed ? "▶" : "▼",
+            Dock      = DockStyle.Left,
+            Width     = 16,
+            TextAlign = System.Drawing.ContentAlignment.MiddleCenter,
+            Cursor    = Cursors.Hand,
+        };
+
         Label nameLabel = new Label
         {
             Text      = shortName,
             Dock      = DockStyle.Left,
             AutoSize  = false,
-            Width     = 160,
+            Width     = 152,
             TextAlign = System.Drawing.ContentAlignment.MiddleLeft,
         };
 
@@ -297,6 +408,7 @@ public sealed class InspectorPanel : UserControl
         header.Controls.Add(removeBtn);
         header.Controls.Add(enabledChk);
         header.Controls.Add(nameLabel);
+        header.Controls.Add(chevron);
 
         // --- Body (properties) ---
         List<(string label, Control ctrl)> rows = BuildPropertyRows(behaviour, owner);
@@ -304,9 +416,10 @@ public sealed class InspectorPanel : UserControl
 
         Panel body = new Panel
         {
-            Dock    = DockStyle.Top,
-            Height  = bodyHeight,
-            Padding = new System.Windows.Forms.Padding(4, 2, 4, 2),
+            Dock      = DockStyle.Top,
+            Height    = bodyHeight,
+            Padding   = new System.Windows.Forms.Padding(4, 2, 4, 2),
+            Visible   = !collapsed,
         };
 
         for (int i = 0; i < rows.Count; i++)
@@ -322,12 +435,30 @@ public sealed class InspectorPanel : UserControl
             body.Controls.Add(ctrl);
         }
 
+        // Collapse toggle
+        string capturedName = shortName;
+        chevron.Click += (_, _) => ToggleSectionCollapse(capturedName, chevron, body, outerPanel, bodyHeight);
+        header.Click  += (_, _) => ToggleSectionCollapse(capturedName, chevron, body, outerPanel, bodyHeight);
+
         // Add body first, then header (DockStyle.Top: last-added = topmost)
         outerPanel.Controls.Add(body);
         outerPanel.Controls.Add(header);
-        outerPanel.Height = 28 + bodyHeight;
+        outerPanel.Height = collapsed ? 28 : 28 + bodyHeight;
 
         return outerPanel;
+    }
+
+    private void ToggleSectionCollapse(string sectionName, Label chevron, Panel body, Panel outer, int bodyHeight)
+    {
+        bool nowCollapsed = body.Visible;
+        body.Visible  = !nowCollapsed;
+        chevron.Text  = nowCollapsed ? "▶" : "▼";
+        outer.Height  = nowCollapsed ? 28 : 28 + bodyHeight;
+        if (_preferences is not null)
+        {
+            _preferences.BehaviourSectionCollapsed[sectionName] = nowCollapsed;
+            _preferences.Save();
+        }
     }
 
     private List<(string, Control)> BuildPropertyRows(EditorBehaviour behaviour, EditorGameObject owner)
@@ -415,9 +546,38 @@ public sealed class InspectorPanel : UserControl
 
         if (pType.IsEnum)
         {
+            bool isFlags = pType.GetCustomAttribute<FlagsAttribute>() is not null;
+
+            if (isFlags)
+            {
+                CheckedListBox clb = new CheckedListBox { CheckOnClick = true, Height = RowHeight * 3 };
+                string[] names = Enum.GetNames(pType);
+                for (int i = 0; i < names.Length; i++) clb.Items.Add(names[i]);
+
+                if (behaviour.Properties.TryGetValue(prop.Name, out JsonElement flagEl))
+                {
+                    string? flagStr = flagEl.GetString() ?? string.Empty;
+                    for (int i = 0; i < clb.Items.Count; i++)
+                        clb.SetItemChecked(i, flagStr.Contains(clb.Items[i]!.ToString()!, StringComparison.Ordinal));
+                }
+
+                clb.ItemCheck += (_, _) =>
+                {
+                    List<string> checked_ = [];
+                    for (int i = 0; i < clb.Items.Count; i++)
+                        if (clb.GetItemChecked(i)) checked_.Add(clb.Items[i]!.ToString()!);
+                    string combined = string.Join(", ", checked_);
+                    JsonElement prev = behaviour.Properties.TryGetValue(prop.Name, out JsonElement prevEl) ? prevEl : default;
+                    JsonElement newEl = JsonDocument.Parse($"\"{combined}\"").RootElement;
+                    _context!.Commands.Execute(new SetPropertyCommand<JsonElement>(
+                        $"Set {prop.Name}", prev, newEl, v => behaviour.Properties[prop.Name] = v));
+                };
+                return clb;
+            }
+
             ComboBox combo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList };
-            string[] names = Enum.GetNames(pType);
-            for (int i = 0; i < names.Length; i++) combo.Items.Add(names[i]);
+            string[] enumNames = Enum.GetNames(pType);
+            for (int i = 0; i < enumNames.Length; i++) combo.Items.Add(enumNames[i]);
 
             if (behaviour.Properties.TryGetValue(prop.Name, out JsonElement enumEl))
                 combo.SelectedItem = enumEl.GetString();
@@ -436,6 +596,42 @@ public sealed class InspectorPanel : UserControl
                     v => behaviour.Properties[prop.Name] = v));
             };
             return combo;
+        }
+
+        if (pType == typeof(System.Drawing.Color))
+        {
+            System.Drawing.Color current = System.Drawing.Color.White;
+            if (behaviour.Properties.TryGetValue(prop.Name, out JsonElement colorEl) && colorEl.ValueKind == JsonValueKind.String)
+            {
+                string? hex = colorEl.GetString();
+                if (!string.IsNullOrEmpty(hex))
+                    try { current = System.Drawing.ColorTranslator.FromHtml(hex); } catch { }
+            }
+
+            Panel colorRow = new Panel { Height = RowHeight };
+            Panel swatch = new Panel
+            {
+                Dock      = DockStyle.Left,
+                Width     = 24,
+                Height    = 22,
+                BackColor = current,
+                BorderStyle = BorderStyle.FixedSingle,
+            };
+            Button pickBtn = new Button { Text = "...", Dock = DockStyle.Fill };
+            pickBtn.Click += (_, _) =>
+            {
+                using ColorDialog dlg = new ColorDialog { Color = swatch.BackColor, FullOpen = true };
+                if (dlg.ShowDialog(this) != DialogResult.OK) return;
+                swatch.BackColor = dlg.Color;
+                string hex = System.Drawing.ColorTranslator.ToHtml(dlg.Color);
+                JsonElement prev = behaviour.Properties.TryGetValue(prop.Name, out JsonElement prevEl) ? prevEl : default;
+                JsonElement newEl = JsonDocument.Parse($"\"{hex}\"").RootElement;
+                _context!.Commands.Execute(new SetPropertyCommand<JsonElement>(
+                    $"Set {prop.Name}", prev, newEl, v => behaviour.Properties[prop.Name] = v));
+            };
+            colorRow.Controls.Add(pickBtn);
+            colorRow.Controls.Add(swatch);
+            return colorRow;
         }
 
         // Fallback: read-only text box

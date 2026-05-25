@@ -15,7 +15,14 @@ public sealed class SceneHierarchyPanel : UserControl
     private bool _suppressCheckEvent;
     private readonly List<EditorGameObject> _multiSelected = [];
 
-    private readonly TreeView _tree;
+    private readonly ToolStrip       _toolbar;
+    private readonly ToolStripButton _addBtn;
+    private readonly ToolStripButton _deleteBtn;
+    private readonly ToolStripTextBox _searchBox;
+    private readonly ToolStripLabel  _counterLabel;
+    private readonly TreeView        _tree;
+    private readonly ImageList       _entityIcons;
+    private readonly Label           _statusLabel;
     private readonly ContextMenuStrip _contextMenu;
     private readonly ToolStripMenuItem _createEmptyItem;
     private readonly ToolStripMenuItem _createChildItem;
@@ -37,6 +44,29 @@ public sealed class SceneHierarchyPanel : UserControl
     /// <summary>Creates the panel with a TreeView and context menu. Call <see cref="Initialize"/> to connect to the editor context.</summary>
     public SceneHierarchyPanel()
     {
+        // ── Entity icon list (16×16) ─────────────────────────────────────
+        _entityIcons = new ImageList { ImageSize = new System.Drawing.Size(16, 16) };
+        _entityIcons.Images.Add(MakeColorSquare(System.Drawing.Color.Gray));           // 0 Generic
+        _entityIcons.Images.Add(MakeColorSquare(System.Drawing.Color.CornflowerBlue)); // 1 Camera
+        _entityIcons.Images.Add(MakeColorSquare(System.Drawing.Color.Goldenrod));      // 2 Light
+        _entityIcons.Images.Add(MakeColorSquare(System.Drawing.Color.HotPink));        // 3 Particles
+        _entityIcons.Images.Add(MakeColorSquare(System.Drawing.Color.ForestGreen));    // 4 Tilemap
+
+        // ── Toolbar ──────────────────────────────────────────────────────
+        _addBtn    = new ToolStripButton("+") { ToolTipText = "Create empty entity", DisplayStyle = ToolStripItemDisplayStyle.Text };
+        _deleteBtn = new ToolStripButton("🗑") { ToolTipText = "Delete selected entity", DisplayStyle = ToolStripItemDisplayStyle.Text };
+        _searchBox = new ToolStripTextBox { Width = 110 };
+        ((System.Windows.Forms.TextBox)_searchBox.Control).PlaceholderText = "Search...";
+        _counterLabel = new ToolStripLabel("0 entities") { Alignment = ToolStripItemAlignment.Right, ForeColor = System.Drawing.SystemColors.GrayText };
+
+        _toolbar = new ToolStrip { Dock = DockStyle.Top, Height = 25, GripStyle = ToolStripGripStyle.Hidden };
+        _toolbar.Items.Add(_addBtn);
+        _toolbar.Items.Add(_deleteBtn);
+        _toolbar.Items.Add(new ToolStripSeparator());
+        _toolbar.Items.Add(_searchBox);
+        _toolbar.Items.Add(_counterLabel);
+
+        // ── Context menu ─────────────────────────────────────────────────
         _createEmptyItem  = new ToolStripMenuItem("Create Empty");
         _createChildItem  = new ToolStripMenuItem("Create Child");
         _duplicateItem    = new ToolStripMenuItem("Duplicate\tCtrl+D");
@@ -65,21 +95,42 @@ public sealed class SceneHierarchyPanel : UserControl
             _revertPrefabItem,
         });
 
+        // ── TreeView ─────────────────────────────────────────────────────
         _tree = new TreeView
         {
-            Dock        = DockStyle.Fill,
-            CheckBoxes  = true,
-            AllowDrop   = true,
-            LabelEdit   = true,
+            Dock          = DockStyle.Fill,
+            CheckBoxes    = true,
+            AllowDrop     = true,
+            LabelEdit     = true,
             HideSelection = false,
             FullRowSelect = true,
-            BorderStyle = BorderStyle.None,
+            BorderStyle   = BorderStyle.None,
+            ImageList     = _entityIcons,
             ContextMenuStrip = _contextMenu,
         };
 
+        // ── Status label ─────────────────────────────────────────────────
+        _statusLabel = new Label
+        {
+            Dock      = DockStyle.Bottom,
+            Height    = 18,
+            Font      = new System.Drawing.Font("Segoe UI", 7.5f),
+            ForeColor = System.Drawing.SystemColors.GrayText,
+            TextAlign = System.Drawing.ContentAlignment.MiddleLeft,
+            Padding   = new Padding(4, 0, 0, 0),
+            Text      = "0 objects in scene",
+        };
+
         Controls.Add(_tree);
+        Controls.Add(_toolbar);
+        Controls.Add(_statusLabel);
+
         WireTreeEvents();
         WireMenuEvents();
+
+        _addBtn.Click    += OnCreateEmpty;
+        _deleteBtn.Click += OnDelete;
+        _searchBox.TextChanged += (_, _) => RefreshTreeSafe();
     }
 
     #endregion
@@ -147,14 +198,49 @@ public sealed class SceneHierarchyPanel : UserControl
         _tree.Nodes.Clear();
         _multiSelected.Clear();
 
+        int totalCount = 0;
         if (scene is not null)
         {
+            string filter = _searchBox.Text?.Trim() ?? string.Empty;
             for (int i = 0; i < scene.RootGameObjects.Count; i++)
-                _tree.Nodes.Add(BuildNode(scene.RootGameObjects[i]));
+            {
+                EditorGameObject obj = scene.RootGameObjects[i];
+                totalCount += CountObjects(obj);
+                if (string.IsNullOrEmpty(filter) || MatchesFilter(obj, filter))
+                    _tree.Nodes.Add(BuildNode(obj));
+            }
             _tree.ExpandAll();
         }
 
+        int visibleCount = CountTreeNodes(_tree.Nodes);
+        _counterLabel.Text = $"{visibleCount} entities";
+        _statusLabel.Text  = $"{totalCount} objects in scene";
+
         _tree.EndUpdate();
+    }
+
+    private static int CountObjects(EditorGameObject obj)
+    {
+        int count = 1;
+        for (int i = 0; i < obj.Children.Count; i++)
+            count += CountObjects(obj.Children[i]);
+        return count;
+    }
+
+    private static int CountTreeNodes(TreeNodeCollection nodes)
+    {
+        int count = nodes.Count;
+        for (int i = 0; i < nodes.Count; i++)
+            count += CountTreeNodes(nodes[i].Nodes);
+        return count;
+    }
+
+    private static bool MatchesFilter(EditorGameObject obj, string filter)
+    {
+        if (obj.Name.Contains(filter, StringComparison.OrdinalIgnoreCase)) return true;
+        for (int i = 0; i < obj.Children.Count; i++)
+            if (MatchesFilter(obj.Children[i], filter)) return true;
+        return false;
     }
 
     private void RefreshTreeSafe()
@@ -165,7 +251,13 @@ public sealed class SceneHierarchyPanel : UserControl
 
     private static TreeNode BuildNode(EditorGameObject obj)
     {
-        TreeNode node = new TreeNode(obj.Name) { Tag = obj, Checked = obj.Active };
+        TreeNode node = new TreeNode(obj.Name)
+        {
+            Tag                = obj,
+            Checked            = obj.Active,
+            ImageIndex         = 0,
+            SelectedImageIndex = 0,
+        };
         if (obj.PrefabPath is not null)
             node.ForeColor = System.Drawing.Color.CornflowerBlue;
         for (int i = 0; i < obj.Children.Count; i++)
@@ -533,6 +625,14 @@ public sealed class SceneHierarchyPanel : UserControl
     #endregion
 
     #region Helpers
+
+    private static System.Drawing.Bitmap MakeColorSquare(System.Drawing.Color color)
+    {
+        System.Drawing.Bitmap bmp = new(16, 16);
+        using System.Drawing.Graphics g = System.Drawing.Graphics.FromImage(bmp);
+        g.Clear(color);
+        return bmp;
+    }
 
     private void SelectAndEditNode(EditorGameObject obj)
     {

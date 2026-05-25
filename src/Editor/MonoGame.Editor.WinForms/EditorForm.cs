@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace MonoGame.Editor.WinForms;
 
 /// <summary>Main editor window. Logic and event wiring.</summary>
@@ -6,12 +8,16 @@ public sealed partial class EditorForm : Form
     private readonly EditorContext _context = null!;
     private readonly EditorPreferences _preferences = null!;
     private readonly GameObjectRegistry _registry = null!;
-    private readonly PrefabManager _prefabManager = new();
-    private readonly GizmoController _gizmoCtrl = new();
-    private GizmoRenderer? _gizmoRenderer;
-    private readonly ContentWatcher _contentWatcher = null!;
-    private ToolStripMenuItem _saveProjectMenuItem = null!;
-    private ToolStripMenuItem _openRecentMenuItem = null!;
+    private readonly PrefabManager  _prefabManager   = new();
+    private readonly GizmoController _gizmoCtrl      = new();
+    private GizmoRenderer?           _gizmoRenderer;
+    private readonly ContentWatcher  _contentWatcher  = null!;
+    private ToolStripMenuItem        _saveSceneMenuItem   = null!;
+    private ToolStripMenuItem        _saveSceneAsMenuItem = null!;
+    private ToolStripMenuItem        _newSceneMenuItem    = null!;
+    private ToolStripMenuItem        _openRecentMenuItem  = null!;
+    private ProjectSettings?         _projectSettings;
+    private readonly ICodeGenService _codeGenService = new SceneCodeGenerator();
 
     /// <summary>Designer-only constructor.</summary>
     public EditorForm() => InitializeComponent();
@@ -49,6 +55,9 @@ public sealed partial class EditorForm : Form
         _viewInspectorMenuItem.Checked    = _preferences.InspectorVisible;
         _viewAssetBrowserMenuItem.Checked = _preferences.AssetBrowserVisible;
         _viewConsoleMenuItem.Checked      = _preferences.ConsoleVisible;
+        _viewSceneManagerMenuItem.Checked = _preferences.SceneManagerVisible;
+        _viewLocalizationMenuItem.Checked = _preferences.LocalizationBrowserVisible;
+        _viewInputMapEditorMenuItem.Checked = _preferences.InputMapEditorVisible;
         _assetBrowserPanel.SplitterDistance = _preferences.AssetBrowserSplitterDistance;
 
         UpdatePanelVisibility();
@@ -75,8 +84,10 @@ public sealed partial class EditorForm : Form
         _context.EventBus.Subscribe<UndoPerformedEvent>(OnUndoPerformed);
         _context.EventBus.Subscribe<RedoPerformedEvent>(OnRedoPerformed);
         _context.EventBus.Subscribe<ProjectOpenedEvent>(OnProjectOpened);
+        _context.EventBus.Subscribe<SceneLoadedEvent>(OnSceneLoaded);
+        _context.EventBus.Subscribe<SceneDirtyChangedEvent>(OnSceneDirtyChanged);
 
-        FormClosing += (_, _) => SavePreferences();
+        FormClosing += OnFormClosing;
         _viewport.RenderFrame += OnViewportRenderFrame;
         _toolbarTable.Resize  += (_, _) => CenterPlaybackStrip();
 
@@ -92,6 +103,9 @@ public sealed partial class EditorForm : Form
         _hierarchyPanel.Initialize(_context, _prefabManager);
         _inspectorPanel.Initialize(_context, _registry, _prefabManager);
         _assetBrowserPanel.Initialize(_context);
+        _sceneManagerPanel.Initialize(_context);
+        _localizationPanel.Initialize(_context);
+        _inputMapEditorPanel.Initialize(_context);
 
         // Build menus programmatically (avoids Designer.cs C#-version concerns)
         BuildFileMenuExtras();
@@ -108,6 +122,9 @@ public sealed partial class EditorForm : Form
         _preferences.InspectorVisible    = _viewInspectorMenuItem.Checked;
         _preferences.AssetBrowserVisible = _viewAssetBrowserMenuItem.Checked;
         _preferences.ConsoleVisible      = _viewConsoleMenuItem.Checked;
+        _preferences.SceneManagerVisible = _viewSceneManagerMenuItem.Checked;
+        _preferences.LocalizationBrowserVisible = _viewLocalizationMenuItem.Checked;
+        _preferences.InputMapEditorVisible = _viewInputMapEditorMenuItem.Checked;
         _preferences.Save();
     }
 
@@ -117,6 +134,8 @@ public sealed partial class EditorForm : Form
         _context.EventBus.Unsubscribe<UndoPerformedEvent>(OnUndoPerformed);
         _context.EventBus.Unsubscribe<RedoPerformedEvent>(OnRedoPerformed);
         _context.EventBus.Unsubscribe<ProjectOpenedEvent>(OnProjectOpened);
+        _context.EventBus.Unsubscribe<SceneLoadedEvent>(OnSceneLoaded);
+        _context.EventBus.Unsubscribe<SceneDirtyChangedEvent>(OnSceneDirtyChanged);
         _contentWatcher.Dispose();
         _gizmoRenderer?.Dispose();
         base.OnFormClosed(e);
@@ -271,6 +290,38 @@ public sealed partial class EditorForm : Form
         _scaleModeButton.Checked  = mode == GizmoMode.Scale;
     }
 
+    private void OnFormClosing(object? sender, FormClosingEventArgs e)
+    {
+        if (_context.IsSceneDirty)
+        {
+            DialogResult answer = MessageBox.Show(this,
+                "The current scene has unsaved changes.\n\nSave before closing?",
+                "Unsaved Changes", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+
+            if (answer == DialogResult.Cancel)
+            {
+                e.Cancel = true;
+                return;
+            }
+
+            if (answer == DialogResult.Yes)
+            {
+                EditorScene? scene = _context.ActiveScene;
+                if (scene is not null && !string.IsNullOrEmpty(scene.ScenePath))
+                {
+                    try
+                    {
+                        SceneSerializer.SaveAsync(scene, scene.ScenePath).GetAwaiter().GetResult();
+                        _context.MarkSceneClean();
+                    }
+                    catch { /* best-effort on close */ }
+                }
+            }
+        }
+
+        SavePreferences();
+    }
+
     #endregion
 
     #region View menu
@@ -280,14 +331,20 @@ public sealed partial class EditorForm : Form
         _outerSplit.Panel1Collapsed = !_viewHierarchyMenuItem.Checked;
         _innerSplit.Panel2Collapsed = !_viewInspectorMenuItem.Checked;
 
-        bool assetsVisible  = _viewAssetBrowserMenuItem.Checked;
-        bool consoleVisible = _viewConsoleMenuItem.Checked;
+        bool assetsVisible        = _viewAssetBrowserMenuItem.Checked;
+        bool consoleVisible       = _viewConsoleMenuItem.Checked;
+        bool sceneManagerVisible  = _viewSceneManagerMenuItem.Checked;
+        bool localizationVisible  = _viewLocalizationMenuItem.Checked;
+        bool inputMapVisible      = _viewInputMapEditorMenuItem.Checked;
 
         _bottomTabControl.TabPages.Clear();
-        if (assetsVisible)  _bottomTabControl.TabPages.Add(_assetsTab);
-        if (consoleVisible) _bottomTabControl.TabPages.Add(_consoleTab);
+        if (assetsVisible)       _bottomTabControl.TabPages.Add(_assetsTab);
+        if (consoleVisible)      _bottomTabControl.TabPages.Add(_consoleTab);
+        if (sceneManagerVisible) _bottomTabControl.TabPages.Add(_sceneManagerTab);
+        if (localizationVisible) _bottomTabControl.TabPages.Add(_localizationTab);
+        if (inputMapVisible)     _bottomTabControl.TabPages.Add(_inputMapEditorTab);
 
-        _mainSplit.Panel2Collapsed = !assetsVisible && !consoleVisible;
+        _mainSplit.Panel2Collapsed = !assetsVisible && !consoleVisible && !sceneManagerVisible && !localizationVisible && !inputMapVisible;
     }
 
     private void OnViewMenuItemClick(object? sender, EventArgs e) => UpdatePanelVisibility();
@@ -302,6 +359,9 @@ public sealed partial class EditorForm : Form
         _viewInspectorMenuItem.Checked    = defaults.InspectorVisible;
         _viewAssetBrowserMenuItem.Checked = defaults.AssetBrowserVisible;
         _viewConsoleMenuItem.Checked      = defaults.ConsoleVisible;
+        _viewSceneManagerMenuItem.Checked = defaults.SceneManagerVisible;
+        _viewLocalizationMenuItem.Checked = defaults.LocalizationBrowserVisible;
+        _viewInputMapEditorMenuItem.Checked = defaults.InputMapEditorVisible;
         UpdatePanelVisibility();
 
         _outerSplit.Panel1MinSize = 180;
@@ -364,6 +424,55 @@ public sealed partial class EditorForm : Form
         };
         buildContentItem.Click += OnBuildContentClick;
         _projectMenu.DropDownItems.Add(buildContentItem);
+
+        ToolStripMenuItem buildGameItem = new()
+        {
+            Text             = "Build Game",
+            ShortcutKeys     = Keys.Control | Keys.B,
+            ShowShortcutKeys = true,
+        };
+        buildGameItem.Click += OnBuildGameClick;
+        _projectMenu.DropDownItems.Add(buildGameItem);
+
+        ToolStripMenuItem runGameItem = new()
+        {
+            Text             = "Run Game",
+            ShortcutKeys     = Keys.Control | Keys.F5,
+            ShowShortcutKeys = true,
+        };
+        runGameItem.Click += OnRunGameClick;
+        _projectMenu.DropDownItems.Add(runGameItem);
+
+        _projectMenu.DropDownItems.Add(new ToolStripSeparator());
+
+        ToolStripMenuItem settingsItem = new() { Text = "Project Settings..." };
+        settingsItem.Click += OnProjectSettingsClick;
+        _projectMenu.DropDownItems.Add(settingsItem);
+
+        _projectMenu.DropDownItems.Add(new ToolStripSeparator());
+
+        ToolStripMenuItem generateSceneItem = new()
+        {
+            Text             = "Generate Scene Code",
+            ShortcutKeys     = Keys.Control | Keys.G,
+            ShowShortcutKeys = true,
+        };
+        generateSceneItem.Click += OnGenerateSceneCodeClick;
+        _projectMenu.DropDownItems.Add(generateSceneItem);
+
+        ToolStripMenuItem generateAllItem = new() { Text = "Generate All Scenes" };
+        generateAllItem.Click += OnGenerateAllScenesClick;
+        _projectMenu.DropDownItems.Add(generateAllItem);
+
+        _projectMenu.DropDownItems.Add(new ToolStripSeparator());
+
+        ToolStripMenuItem rescanItem = new() { Text = "Rescan Behaviours" };
+        rescanItem.Click += OnRescanBehavioursClick;
+        _projectMenu.DropDownItems.Add(rescanItem);
+
+        ToolStripMenuItem newBehaviourItem = new() { Text = "New Behaviour..." };
+        newBehaviourItem.Click += OnNewBehaviourClick;
+        _projectMenu.DropDownItems.Add(newBehaviourItem);
     }
 
     private async void OnBuildContentClick(object? sender, EventArgs e)
@@ -401,24 +510,362 @@ public sealed partial class EditorForm : Form
         }
     }
 
+    private async void OnBuildGameClick(object? sender, EventArgs e)
+    {
+        EditorProject? project = _context.ActiveProject;
+        if (project is null)
+        {
+            _consolePanel.AppendLine("[Build] No project is open.");
+            return;
+        }
+
+        if (string.IsNullOrEmpty(project.GameCsprojPath))
+        {
+            _consolePanel.AppendLine("[Build] No game .csproj configured. Use Project > Project Settings to set it.");
+            return;
+        }
+
+        if (!File.Exists(project.GameCsprojPath))
+        {
+            _consolePanel.AppendLine($"[Build] Game .csproj not found: {project.GameCsprojPath}");
+            return;
+        }
+
+        string config = _projectSettings?.BuildConfiguration ?? "Debug";
+        _consolePanel.AppendLine($"[Build] Building {project.Name} ({config})…");
+        _statusLabel.Text = "Building game…";
+
+        try
+        {
+            int exitCode = await MgcbRunner.RunDotnetBuildAsync(
+                project.GameCsprojPath,
+                config,
+                line => BeginInvoke(() => _consolePanel.AppendBuildLine(line))).ConfigureAwait(true);
+
+            string result = exitCode == 0 ? "Build succeeded." : $"Build failed (exit {exitCode}).";
+            _consolePanel.AppendLine($"[Build] {result}");
+            _statusLabel.Text = result;
+            _context.EventBus.Publish(new BuildOutputLineEvent(result, exitCode != 0));
+
+            if (exitCode == 0)
+                await RescanBehavioursFromBuildAsync(project).ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            _consolePanel.AppendLine($"[Build] Error: {ex.Message}");
+            _statusLabel.Text = "Build error.";
+        }
+    }
+
+    private void OnRunGameClick(object? sender, EventArgs e)
+    {
+        EditorProject? project = _context.ActiveProject;
+        if (project is null)
+        {
+            _consolePanel.AppendLine("[Run] No project is open.");
+            return;
+        }
+
+        if (string.IsNullOrEmpty(project.GameCsprojPath))
+        {
+            _consolePanel.AppendLine("[Run] No game .csproj configured. Use Project > Project Settings to set it.");
+            return;
+        }
+
+        try
+        {
+            string config = _projectSettings?.BuildConfiguration ?? "Debug";
+            ProcessStartInfo psi = new("dotnet",
+                $"run --project \"{project.GameCsprojPath}\" --configuration {config}")
+            {
+                UseShellExecute = false,
+                CreateNoWindow  = false,
+            };
+            Process.Start(psi);
+            _consolePanel.AppendLine($"[Run] Launching {project.Name} ({config})…");
+        }
+        catch (Exception ex)
+        {
+            _consolePanel.AppendLine($"[Run] Error: {ex.Message}");
+        }
+    }
+
+    private async void OnProjectSettingsClick(object? sender, EventArgs e)
+    {
+        EditorProject? project = _context.ActiveProject;
+        if (project is null)
+        {
+            MessageBox.Show(this, "No project is open.", "Project Settings",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        _projectSettings ??= new ProjectSettings();
+
+        using ProjectSettingsDialog dlg = new(project, _projectSettings);
+        if (dlg.ShowDialog(this) != DialogResult.OK) return;
+
+        try
+        {
+            await _projectSettings.SaveAsync(project).ConfigureAwait(true);
+            _consolePanel.AppendLine("[Settings] Project settings saved.");
+        }
+        catch (Exception ex)
+        {
+            _consolePanel.AppendLine($"[Settings] Failed to save settings: {ex.Message}");
+            MessageBox.Show(this, $"Failed to save settings:\n{ex.Message}", "Error",
+                MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    #endregion
+
+    #region Menu — Project (CodeGen)
+
+    private async void OnGenerateSceneCodeClick(object? sender, EventArgs e)
+    {
+        EditorScene?   scene   = _context.ActiveScene;
+        EditorProject? project = _context.ActiveProject;
+
+        if (scene is null || project is null)
+        {
+            _consolePanel.AppendLine("[CodeGen] No scene or project is open.");
+            return;
+        }
+
+        if (string.IsNullOrEmpty(project.GameSourcePath))
+        {
+            _consolePanel.AppendLine("[CodeGen] GameSourcePath is not configured. Open Project Settings.");
+            return;
+        }
+
+        ProjectSettings settings = _projectSettings ?? new ProjectSettings();
+        if (string.IsNullOrWhiteSpace(settings.RootNamespace))
+        {
+            _consolePanel.AppendLine("[CodeGen] RootNamespace is not set. Configure it in Project Settings → Code Generation.");
+            return;
+        }
+
+        _context.EventBus.Publish(new CodeGenStartedEvent(scene.Name));
+        _statusLabel.Text = "Generating code...";
+
+        try
+        {
+            CodeGenResult result = await _codeGenService
+                .GenerateSceneAsync(scene, project, settings)
+                .ConfigureAwait(true);
+
+            if (result.Success)
+                _consolePanel.AppendLine($"[CodeGen] Generated: {result.OutputPath}", LogLevel.Info);
+            else
+                _consolePanel.AppendLine($"[CodeGen] Error: {result.ErrorMessage}", LogLevel.Error);
+
+            _context.EventBus.Publish(new CodeGenCompletedEvent(result));
+            _statusLabel.Text = result.Success ? "Code generated." : "Code gen failed.";
+        }
+        catch (Exception ex)
+        {
+            _consolePanel.AppendLine($"[CodeGen] Exception: {ex.Message}", LogLevel.Error);
+            _statusLabel.Text = "Code gen failed.";
+        }
+    }
+
+    private async void OnGenerateAllScenesClick(object? sender, EventArgs e)
+    {
+        EditorProject? project = _context.ActiveProject;
+        if (project is null)
+        {
+            _consolePanel.AppendLine("[CodeGen] No project is open.");
+            return;
+        }
+
+        if (string.IsNullOrEmpty(project.GameSourcePath) || string.IsNullOrEmpty(project.ScenesPath))
+        {
+            _consolePanel.AppendLine("[CodeGen] GameSourcePath or ScenesPath is not configured.");
+            return;
+        }
+
+        ProjectSettings settings = _projectSettings ?? new ProjectSettings();
+        if (string.IsNullOrWhiteSpace(settings.RootNamespace))
+        {
+            _consolePanel.AppendLine("[CodeGen] RootNamespace is not set. Configure it in Project Settings.");
+            return;
+        }
+
+        if (!Directory.Exists(project.ScenesPath))
+        {
+            _consolePanel.AppendLine($"[CodeGen] Scenes folder not found: {project.ScenesPath}");
+            return;
+        }
+
+        string[] sceneFiles = Directory.GetFiles(project.ScenesPath, "*.scene.json");
+        _consolePanel.AppendLine($"[CodeGen] Generating code for {sceneFiles.Length} scene(s)...");
+        _statusLabel.Text = "Generating all scenes...";
+
+        CodeGenProgressDialog progressDlg = new();
+        progressDlg.Show(this);
+
+        int success = 0;
+        int failed  = 0;
+
+        for (int i = 0; i < sceneFiles.Length; i++)
+        {
+            try
+            {
+                EditorScene? scene = await SceneSerializer.LoadAsync(sceneFiles[i])
+                    .ConfigureAwait(true);
+
+                if (scene is null) { failed++; continue; }
+
+                _context.EventBus.Publish(new CodeGenStartedEvent(scene.Name));
+                CodeGenResult result = await _codeGenService
+                    .GenerateSceneAsync(scene, project, settings)
+                    .ConfigureAwait(true);
+
+                progressDlg.AddFileResult(result.OutputPath.Length > 0 ? result.OutputPath : sceneFiles[i], result.Success);
+
+                if (result.Success)
+                {
+                    _consolePanel.AppendLine($"[CodeGen] ✓ {scene.Name}", LogLevel.Info);
+                    success++;
+                }
+                else
+                {
+                    _consolePanel.AppendLine($"[CodeGen] ✗ {scene.Name}: {result.ErrorMessage}", LogLevel.Error);
+                    failed++;
+                }
+
+                _context.EventBus.Publish(new CodeGenCompletedEvent(result));
+            }
+            catch (Exception ex)
+            {
+                _consolePanel.AppendLine($"[CodeGen] Error processing {Path.GetFileName(sceneFiles[i])}: {ex.Message}", LogLevel.Error);
+                progressDlg.AddFileResult(sceneFiles[i], false);
+                failed++;
+            }
+        }
+
+        progressDlg.MarkComplete(success, failed);
+        _statusLabel.Text = $"CodeGen: {success} OK, {failed} failed.";
+    }
+
+    private async void OnRescanBehavioursClick(object? sender, EventArgs e)
+    {
+        _registry.Scan();
+
+        EditorProject? project = _context.ActiveProject;
+        if (project is not null)
+            await RescanBehavioursFromBuildAsync(project).ConfigureAwait(true);
+
+        _consolePanel.AppendLine($"[CodeGen] Behaviours rescanned. Found {_registry.RegisteredTypes.Count} type(s), {_registry.PendingTypeNames.Count} pending.");
+    }
+
+    private async Task RescanBehavioursFromBuildAsync(EditorProject project)
+    {
+        if (string.IsNullOrEmpty(project.GameCsprojPath)) return;
+
+        string config = _projectSettings?.BuildConfiguration ?? "Debug";
+        string gameDir = project.GameSourcePath;
+        if (string.IsNullOrEmpty(gameDir)) return;
+
+        string projectName = Path.GetFileNameWithoutExtension(project.GameCsprojPath);
+
+        // Try common output paths for a SDK-style project
+        string[] candidates =
+        [
+            Path.Combine(gameDir, "bin", config, "net10.0", $"{projectName}.dll"),
+            Path.Combine(gameDir, "bin", config, $"{projectName}.dll"),
+        ];
+
+        for (int i = 0; i < candidates.Length; i++)
+        {
+            if (File.Exists(candidates[i]))
+            {
+                await _registry.ScanFromAssemblyAsync(candidates[i]).ConfigureAwait(false);
+                _consolePanel.AppendLine($"[CodeGen] Assembly scanned: {Path.GetFileName(candidates[i])} — {_registry.RegisteredTypes.Count} type(s).", LogLevel.Info);
+                return;
+            }
+        }
+
+        // Fallback: scan source files
+        if (Directory.Exists(project.GameSourcePath))
+            await _registry.ScanSourceAsync(project.GameSourcePath).ConfigureAwait(false);
+    }
+
+    private async void OnNewBehaviourClick(object? sender, EventArgs e)
+    {
+        EditorProject? project = _context.ActiveProject;
+        string gameSourcePath  = project?.GameSourcePath ?? string.Empty;
+
+        using NewBehaviourDialog dlg = new(gameSourcePath);
+        if (dlg.ShowDialog(this) != DialogResult.OK) return;
+
+        if (string.IsNullOrEmpty(dlg.ClassName)) return;
+
+        _statusLabel.Text = $"Creating {dlg.ClassName}...";
+
+        try
+        {
+            CodeGenResult result = await _codeGenService.GenerateBehaviourSkeletonAsync(
+                dlg.ClassName,
+                dlg.NamespaceName,
+                dlg.RelativeFolder,
+                dlg.SelectedMethods,
+                project ?? new EditorProject("(none)", string.Empty)).ConfigureAwait(true);
+
+            if (result.Success)
+            {
+                _consolePanel.AppendLine($"[CodeGen] Created: {result.OutputPath}", LogLevel.Info);
+                _registry.Scan();
+            }
+            else
+            {
+                _consolePanel.AppendLine($"[CodeGen] Failed: {result.ErrorMessage}", LogLevel.Error);
+            }
+
+            _statusLabel.Text = result.Success ? "Behaviour created." : "Failed.";
+        }
+        catch (Exception ex)
+        {
+            _consolePanel.AppendLine($"[CodeGen] Error: {ex.Message}", LogLevel.Error);
+            _statusLabel.Text = "Error.";
+        }
+    }
+
     #endregion
 
     #region Menu — File
 
     private void BuildFileMenuExtras()
     {
-        // "Open Recent ▶" submenu
-        _openRecentMenuItem = new ToolStripMenuItem("Open Recent");
-
-        // "Save Project" Ctrl+S
-        _saveProjectMenuItem = new ToolStripMenuItem("Save Project")
+        _newSceneMenuItem = new ToolStripMenuItem("New Scene...")
         {
-            ShortcutKeys = Keys.Control | Keys.S,
+            ShortcutKeys     = Keys.Control | Keys.Shift | Keys.N,
             ShowShortcutKeys = true,
         };
-        _saveProjectMenuItem.Click += OnFileSaveProjectClick;
+        _newSceneMenuItem.Click += OnFileNewSceneClick;
 
-        // Insert before _fileSeparator: [New | Open] → [New | Open | Recent ▶ | ─── | Save | ─── | Exit]
+        _openRecentMenuItem = new ToolStripMenuItem("Open Recent");
+
+        _saveSceneMenuItem = new ToolStripMenuItem("Save Scene")
+        {
+            ShortcutKeys     = Keys.Control | Keys.S,
+            ShowShortcutKeys = true,
+        };
+        _saveSceneMenuItem.Click += OnFileSaveSceneClick;
+
+        _saveSceneAsMenuItem = new ToolStripMenuItem("Save Scene As...")
+        {
+            ShortcutKeys     = Keys.Control | Keys.Shift | Keys.S,
+            ShowShortcutKeys = true,
+        };
+        _saveSceneAsMenuItem.Click += OnFileSaveSceneAsClick;
+
+        // Target layout: [New Project | New Scene | --- | Open Project | Open Recent | --- | Save Scene | Save Scene As | _fileSeparator | Exit]
+        int newProjIdx = _fileMenu.DropDownItems.IndexOf(_newProjectItem);
+        _fileMenu.DropDownItems.Insert(newProjIdx + 1, _newSceneMenuItem);
+        _fileMenu.DropDownItems.Insert(newProjIdx + 2, new ToolStripSeparator());
+
         int sepIdx = _fileMenu.DropDownItems.IndexOf(_fileSeparator);
         _fileMenu.DropDownItems.Insert(sepIdx, _openRecentMenuItem);
 
@@ -426,7 +873,10 @@ public sealed partial class EditorForm : Form
         _fileMenu.DropDownItems.Insert(sepIdx, new ToolStripSeparator());
 
         sepIdx = _fileMenu.DropDownItems.IndexOf(_fileSeparator);
-        _fileMenu.DropDownItems.Insert(sepIdx, _saveProjectMenuItem);
+        _fileMenu.DropDownItems.Insert(sepIdx, _saveSceneMenuItem);
+
+        sepIdx = _fileMenu.DropDownItems.IndexOf(_fileSeparator);
+        _fileMenu.DropDownItems.Insert(sepIdx, _saveSceneAsMenuItem);
 
         RebuildOpenRecentsMenu();
     }
@@ -475,7 +925,7 @@ public sealed partial class EditorForm : Form
         }
     }
 
-    private async void OnFileSaveProjectClick(object? sender, EventArgs e)
+    private async void OnFileSaveSceneClick(object? sender, EventArgs e)
     {
         EditorScene? scene = _context.ActiveScene;
         EditorProject? project = _context.ActiveProject;
@@ -513,8 +963,12 @@ public sealed partial class EditorForm : Form
                 }
 
                 await SceneSerializer.SaveAsync(scene, scenePath).ConfigureAwait(true);
+                _context.MarkSceneClean();
                 _consolePanel.AppendLine($"[Save] Scene saved to {scenePath}");
                 _statusLabel.Text = "Saved.";
+
+                // Auto-generate code on save when configured
+                await TryGenerateCodeOnSaveAsync(scene, project).ConfigureAwait(true);
             }
         }
         catch (Exception ex)
@@ -524,6 +978,96 @@ public sealed partial class EditorForm : Form
         }
     }
 
+    private async Task TryGenerateCodeOnSaveAsync(EditorScene scene, EditorProject? project)
+    {
+        if (project is null) return;
+        ProjectSettings settings = _projectSettings ?? new ProjectSettings();
+        if (!settings.GenerateOnSave) return;
+        if (string.IsNullOrEmpty(project.GameCsprojPath)) return;
+        if (string.IsNullOrWhiteSpace(settings.RootNamespace)) return;
+
+        _context.EventBus.Publish(new CodeGenStartedEvent(scene.Name));
+        _statusLabel.Text = "Generating code...";
+
+        try
+        {
+            CodeGenResult result = await _codeGenService
+                .GenerateSceneAsync(scene, project, settings)
+                .ConfigureAwait(false);
+
+            if (result.Success)
+                _consolePanel.AppendLine($"[CodeGen] Generated: {result.OutputPath}", LogLevel.Info);
+            else
+                _consolePanel.AppendLine($"[CodeGen] Error: {result.ErrorMessage}", LogLevel.Error);
+
+            _context.EventBus.Publish(new CodeGenCompletedEvent(result));
+            _statusLabel.Text = result.Success ? "Saved + code generated." : "Saved (code gen failed).";
+        }
+        catch (Exception ex)
+        {
+            _consolePanel.AppendLine($"[CodeGen] Exception on save: {ex.Message}", LogLevel.Error);
+            _statusLabel.Text = "Saved (code gen error).";
+        }
+    }
+
+    private async void OnFileSaveSceneAsClick(object? sender, EventArgs e)    {
+        EditorScene? scene = _context.ActiveScene;
+        EditorProject? project = _context.ActiveProject;
+
+        if (scene is null)
+        {
+            _consolePanel.AppendLine("[Save As] No scene is open.");
+            return;
+        }
+
+        string initialDir = project is not null && Directory.Exists(project.ScenesPath)
+            ? project.ScenesPath
+            : Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+
+        using SaveFileDialog dlg = new()
+        {
+            Title = "Save Scene As",
+            Filter = "Scene files (*.scene.json)|*.scene.json|All files (*.*)|*.*",
+            InitialDirectory = initialDir,
+            FileName = string.IsNullOrEmpty(scene.Name) ? "NewScene.scene.json" : $"{scene.Name}.scene.json",
+        };
+
+        if (dlg.ShowDialog(this) != DialogResult.OK) return;
+
+        try
+        {
+            scene.ScenePath = dlg.FileName;
+            scene.Name = Path.GetFileNameWithoutExtension(Path.GetFileNameWithoutExtension(dlg.FileName));
+            await SceneSerializer.SaveAsync(scene, dlg.FileName).ConfigureAwait(true);
+            _context.MarkSceneClean();
+            _consolePanel.AppendLine($"[Save As] Scene saved to {dlg.FileName}");
+            _statusLabel.Text = "Saved.";
+        }
+        catch (Exception ex)
+        {
+            _consolePanel.AppendLine($"[Save As] Error: {ex.Message}");
+            _statusLabel.Text = "Save failed.";
+        }
+    }
+
+    private void OnFileNewSceneClick(object? sender, EventArgs e)
+    {
+        if (_context is null) return;
+
+        using NewSceneDialog dlg = new();
+        if (dlg.ShowDialog(this) != DialogResult.OK) return;
+
+        EditorScene scene = new()
+        {
+            Name      = dlg.SceneName,
+            WorldSize = new EditorVector2(dlg.WorldWidth, dlg.WorldHeight),
+        };
+
+        _context.SetActiveScene(scene);
+        _context.EventBus.Publish(new SceneCreatedEvent(scene));
+        _consolePanel.AppendLine($"[Editor] New scene '{scene.Name}' created.");
+    }
+
     private async void OnFileNewProjectClick(object? sender, EventArgs e)
     {
         using NewProjectDialog dlg = new();
@@ -531,7 +1075,24 @@ public sealed partial class EditorForm : Form
 
         try
         {
-            EditorProject project = await Task.Run(() => ProjectManager.Create(dlg.ProjectName, dlg.ParentPath));
+            string rootPath = Path.Combine(dlg.ParentPath, dlg.ProjectName);
+            string contentRel = string.IsNullOrWhiteSpace(dlg.ContentPath)
+                ? "Content"
+                : Path.GetRelativePath(
+                    string.IsNullOrWhiteSpace(dlg.GameCsprojPath)
+                        ? rootPath
+                        : Path.GetDirectoryName(dlg.GameCsprojPath)!,
+                    dlg.ContentPath);
+            string locRel = string.IsNullOrWhiteSpace(dlg.LocalizationPath)
+                ? "Localization"
+                : Path.GetRelativePath(
+                    string.IsNullOrWhiteSpace(dlg.GameCsprojPath)
+                        ? rootPath
+                        : Path.GetDirectoryName(dlg.GameCsprojPath)!,
+                    dlg.LocalizationPath);
+
+            EditorProject project = await Task.Run(() =>
+                ProjectManager.Create(dlg.ProjectName, dlg.ParentPath, dlg.GameCsprojPath, contentRel, locRel));
             _context.SetActiveProject(project);
             _preferences.LastProjectPath = project.RootPath;
             _preferences.AddRecentProject(project.RootPath);
@@ -603,12 +1164,62 @@ public sealed partial class EditorForm : Form
     private void OnProjectOpened(ProjectOpenedEvent evt)
     {
         if (InvokeRequired) { BeginInvoke(() => OnProjectOpened(evt)); return; }
-        Text = evt.Project is null ? "MonoGame Editor" : $"MonoGame Editor — {evt.Project.Name}";
+
+        UpdateFormTitle();
 
         string contentPath = evt.Project?.ContentPath ?? string.Empty;
         _contentWatcher.Watch(contentPath);
 
         RebuildOpenRecentsMenu();
+
+        if (evt.Project is not null)
+            _ = LoadProjectSettingsAsync(evt.Project);
+    }
+
+    private async Task LoadProjectSettingsAsync(EditorProject project)
+    {
+        try
+        {
+            _projectSettings = await ProjectSettings.LoadAsync(project).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _consolePanel.AppendLine($"[Settings] Failed to load project settings: {ex.Message}");
+        }
+    }
+
+    private void OnSceneLoaded(SceneLoadedEvent evt)
+    {
+        if (InvokeRequired) { BeginInvoke(() => OnSceneLoaded(evt)); return; }
+        UpdateFormTitle();
+    }
+
+    private void OnSceneDirtyChanged(SceneDirtyChangedEvent evt)
+    {
+        if (InvokeRequired) { BeginInvoke(() => OnSceneDirtyChanged(evt)); return; }
+        UpdateFormTitle();
+    }
+
+    private void UpdateFormTitle()
+    {
+        EditorProject? project = _context.ActiveProject;
+        EditorScene? scene     = _context.ActiveScene;
+        bool dirty             = _context.IsSceneDirty;
+
+        if (project is null)
+        {
+            Text = "MonoGame Editor";
+            return;
+        }
+
+        if (scene is null)
+        {
+            Text = $"MonoGame Editor — {project.Name}";
+            return;
+        }
+
+        string dirtyMarker = dirty ? " *" : string.Empty;
+        Text = $"MonoGame Editor — {project.Name} — {scene.Name}{dirtyMarker}";
     }
 
     #endregion

@@ -25,15 +25,37 @@ public sealed class EditorProject
     public string LocalizationPath { get; }
 
     /// <summary>
+    /// Absolute path to the main game <c>.csproj</c> file.
+    /// Empty string if not configured.
+    /// </summary>
+    public string GameCsprojPath { get; }
+
+    /// <summary>
+    /// Absolute path to the directory that contains <see cref="GameCsprojPath"/>.
+    /// Empty string if <see cref="GameCsprojPath"/> is not set.
+    /// </summary>
+    public string GameSourcePath { get; }
+
+    /// <summary>
     /// Initializes the project with computed sub-paths derived from <paramref name="rootPath"/>.
     /// </summary>
     /// <param name="name">Project name.</param>
     /// <param name="rootPath">Absolute path to the project root.</param>
-    /// <param name="contentRelativePath">Relative path to the game content folder (default: <c>Content</c>).</param>
-    /// <param name="localizationRelativePath">Relative path to the localization folder (default: <c>Localization</c>).</param>
+    /// <param name="gameCsprojPath">Absolute path to the main game .csproj file (optional).</param>
+    /// <param name="contentRelativePath">
+    /// Relative path to the game content folder.
+    /// Resolved relative to <paramref name="gameCsprojPath"/>'s directory when provided,
+    /// otherwise relative to <paramref name="rootPath"/>. Default: <c>Content</c>.
+    /// </param>
+    /// <param name="localizationRelativePath">
+    /// Relative path to the localization folder.
+    /// Resolved relative to <paramref name="gameCsprojPath"/>'s directory when provided,
+    /// otherwise relative to <paramref name="rootPath"/>. Default: <c>Localization</c>.
+    /// </param>
     public EditorProject(
         string name,
         string rootPath,
+        string gameCsprojPath = "",
         string contentRelativePath = "Content",
         string localizationRelativePath = "Localization")
     {
@@ -45,7 +67,13 @@ public sealed class EditorProject
         EditorPath       = Path.Combine(rootPath, "Editor");
         ScenesPath       = Path.Combine(EditorPath, "Scenes");
         PrefabsPath      = Path.Combine(EditorPath, "Prefabs");
-        ContentPath      = Path.Combine(rootPath, contentRelativePath);
-        LocalizationPath = Path.Combine(rootPath, localizationRelativePath);
+        GameCsprojPath   = gameCsprojPath ?? string.Empty;
+        GameSourcePath   = string.IsNullOrWhiteSpace(GameCsprojPath)
+                               ? string.Empty
+                               : Path.GetDirectoryName(GameCsprojPath) ?? string.Empty;
+
+        string baseForPaths = string.IsNullOrWhiteSpace(GameSourcePath) ? rootPath : GameSourcePath;
+        ContentPath      = Path.Combine(baseForPaths, contentRelativePath);
+        LocalizationPath = Path.Combine(baseForPaths, localizationRelativePath);
     }
 }

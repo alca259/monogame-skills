@@ -14,28 +14,51 @@ public static class ProjectManager
         Path.Combine(rootPath, EditorFolderName, ProjectFileName);
 
     /// <summary>
-    /// Creates a new project named <paramref name="name"/> inside <paramref name="parentPath"/>,
-    /// scaffolding the required folder structure and writing <c>Editor/project.json</c>.
+    /// Creates or initializes an editor project named <paramref name="name"/> inside <paramref name="parentPath"/>.
+    /// If the target folder already exists (e.g. an existing game project), only the editor
+    /// sub-structure is scaffolded without touching existing source files.
     /// </summary>
-    /// <exception cref="ArgumentException">Thrown when <paramref name="name"/> or <paramref name="parentPath"/> is empty.</exception>
-    /// <exception cref="IOException">Thrown when the target folder already exists.</exception>
-    public static EditorProject Create(string name, string parentPath)
+    /// <param name="name">Project name (used as the subfolder name).</param>
+    /// <param name="parentPath">Parent directory where the project folder lives or will be created.</param>
+    /// <param name="gameCsprojPath">Optional absolute path to the main game .csproj file.</param>
+    /// <param name="contentRelativePath">
+    /// Relative path to the content folder. When <paramref name="gameCsprojPath"/> is set,
+    /// resolved relative to its directory; otherwise relative to the project root.
+    /// </param>
+    /// <param name="localizationRelativePath">
+    /// Relative path to the localization folder. Same resolution rules as content.
+    /// </param>
+    /// <exception cref="ArgumentException">Thrown when name or parentPath is empty.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when the target folder already contains an editor project (use Load instead).
+    /// </exception>
+    public static EditorProject Create(
+        string name,
+        string parentPath,
+        string gameCsprojPath = "",
+        string contentRelativePath = "Content",
+        string localizationRelativePath = "Localization")
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentException.ThrowIfNullOrWhiteSpace(parentPath);
 
         string rootPath = Path.Combine(parentPath, name);
 
-        if (Directory.Exists(rootPath))
-            throw new IOException($"A folder named '{name}' already exists at '{parentPath}'.");
+        if (Directory.Exists(rootPath) && File.Exists(GetProjectFilePath(rootPath)))
+            throw new InvalidOperationException(
+                $"'{rootPath}' is already an editor project. Use 'Open Project' to open it.");
 
-        EditorProject project = new(name, rootPath);
+        EditorProject project = new(name, rootPath, gameCsprojPath, contentRelativePath, localizationRelativePath);
 
         Directory.CreateDirectory(project.EditorPath);
         Directory.CreateDirectory(project.ScenesPath);
         Directory.CreateDirectory(project.PrefabsPath);
-        Directory.CreateDirectory(project.ContentPath);
-        Directory.CreateDirectory(project.LocalizationPath);
+
+        if (!Directory.Exists(project.ContentPath))
+            Directory.CreateDirectory(project.ContentPath);
+
+        if (!Directory.Exists(project.LocalizationPath))
+            Directory.CreateDirectory(project.LocalizationPath);
 
         WriteProjectFile(project);
 
@@ -62,9 +85,12 @@ public static class ProjectManager
             if (data is null || string.IsNullOrWhiteSpace(data.Name))
                 return null;
 
+            string gameCsprojAbs = ResolveAbsolutePath(projectPath, data.GameCsprojPath);
+
             return new EditorProject(
                 data.Name,
                 projectPath,
+                gameCsprojAbs,
                 string.IsNullOrWhiteSpace(data.ContentPath) ? "Content" : data.ContentPath,
                 string.IsNullOrWhiteSpace(data.LocalizationPath) ? "Localization" : data.LocalizationPath);
         }
@@ -89,26 +115,47 @@ public static class ProjectManager
     }
 
     /// <summary>
+    /// Scans <paramref name="rootPath"/> up to 3 levels deep for the first <c>.csproj</c> file
+    /// that contains a MonoGame <c>PackageReference</c>.
+    /// Returns <c>null</c> if none is found.
+    /// </summary>
+    public static string? FindGameCsproj(string rootPath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(rootPath);
+
+        return SearchForCsproj(rootPath, maxDepth: 3);
+    }
+
+    /// <summary>
     /// Initializes an existing MonoGame solution folder as an editor project:
     /// writes <c>Editor/project.json</c> (name inferred from the solution) and creates
     /// any missing editor folders (<c>Editor/Scenes/</c>, <c>Editor/Prefabs/</c>) plus
     /// standard game folders (<c>Content/</c>, <c>Localization/</c>) if absent.
     /// </summary>
+    /// <param name="projectPath">Path to the existing solution root.</param>
+    /// <param name="gameCsprojPath">Optional explicit path to the game .csproj; auto-detected if empty.</param>
     /// <exception cref="InvalidOperationException">Thrown when no solution file is found.</exception>
-    public static EditorProject Initialize(string projectPath)
+    public static EditorProject Initialize(string projectPath, string gameCsprojPath = "")
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(projectPath);
 
         string name = FindSolutionName(projectPath)
             ?? throw new InvalidOperationException($"No .sln or .slnx file found in '{projectPath}'.");
 
-        EditorProject project = new(name, projectPath);
+        if (string.IsNullOrWhiteSpace(gameCsprojPath))
+            gameCsprojPath = FindGameCsproj(projectPath) ?? string.Empty;
+
+        EditorProject project = new(name, projectPath, gameCsprojPath);
 
         Directory.CreateDirectory(project.EditorPath);
         Directory.CreateDirectory(project.ScenesPath);
         Directory.CreateDirectory(project.PrefabsPath);
-        Directory.CreateDirectory(project.ContentPath);
-        Directory.CreateDirectory(project.LocalizationPath);
+
+        if (!Directory.Exists(project.ContentPath))
+            Directory.CreateDirectory(project.ContentPath);
+
+        if (!Directory.Exists(project.LocalizationPath))
+            Directory.CreateDirectory(project.LocalizationPath);
 
         WriteProjectFile(project);
 
@@ -118,14 +165,65 @@ public static class ProjectManager
     private static void WriteProjectFile(EditorProject project)
     {
         string jsonPath = GetProjectFilePath(project.RootPath);
+
+        string gameCsprojRelative = string.IsNullOrWhiteSpace(project.GameCsprojPath)
+            ? string.Empty
+            : Path.GetRelativePath(project.RootPath, project.GameCsprojPath);
+
         ProjectFileData data = new()
         {
             Name             = project.Name,
-            ContentPath      = Path.GetRelativePath(project.RootPath, project.ContentPath),
-            LocalizationPath = Path.GetRelativePath(project.RootPath, project.LocalizationPath),
+            GameCsprojPath   = gameCsprojRelative,
+            ContentPath      = Path.GetRelativePath(
+                                   string.IsNullOrWhiteSpace(project.GameSourcePath) ? project.RootPath : project.GameSourcePath,
+                                   project.ContentPath),
+            LocalizationPath = Path.GetRelativePath(
+                                   string.IsNullOrWhiteSpace(project.GameSourcePath) ? project.RootPath : project.GameSourcePath,
+                                   project.LocalizationPath),
         };
+
         string json = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
         File.WriteAllText(jsonPath, json);
+    }
+
+    private static string ResolveAbsolutePath(string rootPath, string relativePath)
+    {
+        if (string.IsNullOrWhiteSpace(relativePath))
+            return string.Empty;
+
+        if (Path.IsPathRooted(relativePath))
+            return relativePath;
+
+        return Path.GetFullPath(Path.Combine(rootPath, relativePath));
+    }
+
+    private static string? SearchForCsproj(string directory, int maxDepth)
+    {
+        if (maxDepth < 0 || !Directory.Exists(directory))
+            return null;
+
+        foreach (string file in Directory.GetFiles(directory, "*.csproj"))
+        {
+            try
+            {
+                string content = File.ReadAllText(file);
+                if (content.Contains("MonoGame", StringComparison.OrdinalIgnoreCase))
+                    return file;
+            }
+            catch (IOException)
+            {
+                // skip unreadable files
+            }
+        }
+
+        foreach (string subDir in Directory.GetDirectories(directory))
+        {
+            string? found = SearchForCsproj(subDir, maxDepth - 1);
+            if (found is not null)
+                return found;
+        }
+
+        return null;
     }
 
     private sealed class ProjectFileData
@@ -135,6 +233,9 @@ public static class ProjectManager
 
         [JsonPropertyName("version")]
         public string Version { get; set; } = "1.0";
+
+        [JsonPropertyName("gameCsprojPath")]
+        public string GameCsprojPath { get; set; } = string.Empty;
 
         [JsonPropertyName("contentPath")]
         public string ContentPath { get; set; } = "Content";
