@@ -1,0 +1,596 @@
+namespace MonoGame.Editor.WinForms.Panels;
+
+/// <summary>
+/// Displays and edits properties of the currently selected <see cref="EditorGameObject"/>.
+/// The Transform section is always visible; additional sections are generated per attached
+/// <see cref="EditorBehaviour"/> using reflection over <see cref="EditorPropertyAttribute"/>.
+/// All edits are routed through <see cref="CommandStack"/> for undo/redo support.
+/// </summary>
+public sealed class InspectorPanel : UserControl
+{
+    #region Constants
+
+    private const int LabelWidth   = 72;
+    private const int RowHeight    = 26;
+    private const int SectionGap   = 6;
+    private const int SidePadding  = 6;
+    private const int NumericWidth = 68;
+
+    #endregion
+
+    #region Fields
+
+    private EditorContext?      _context;
+    private GameObjectRegistry? _registry;
+    private PrefabManager?      _prefabManager;
+    private EditorGameObject?   _currentObject;
+    private bool                _suppressUpdate;
+
+    private readonly Panel _scrollPanel;
+
+    private Action<UndoPerformedEvent>? _onUndo;
+    private Action<RedoPerformedEvent>? _onRedo;
+
+    #endregion
+
+    #region Constructor
+
+    /// <summary>Creates the panel. Call <see cref="Initialize"/> to connect to the editor context.</summary>
+    public InspectorPanel()
+    {
+        _scrollPanel = new Panel
+        {
+            Dock       = DockStyle.Fill,
+            AutoScroll = true,
+        };
+        Controls.Add(_scrollPanel);
+        _scrollPanel.ClientSizeChanged += OnScrollPanelResized;
+    }
+
+    #endregion
+
+    #region Initialization
+
+    /// <summary>Connects this panel to the editor context and behaviour registry.</summary>
+    public void Initialize(EditorContext context, GameObjectRegistry? registry = null, PrefabManager? prefabManager = null)
+    {
+        _context       = context;
+        _registry      = registry;
+        _prefabManager = prefabManager;
+
+        _onUndo = _ => RebuildSafe();
+        _onRedo = _ => RebuildSafe();
+
+        _context.EventBus.Subscribe<GameObjectSelectedEvent>(OnGameObjectSelected);
+        _context.EventBus.Subscribe<UndoPerformedEvent>(_onUndo);
+        _context.EventBus.Subscribe<RedoPerformedEvent>(_onRedo);
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing && _context is not null)
+        {
+            _context.EventBus.Unsubscribe<GameObjectSelectedEvent>(OnGameObjectSelected);
+            if (_onUndo is not null) _context.EventBus.Unsubscribe<UndoPerformedEvent>(_onUndo);
+            if (_onRedo is not null) _context.EventBus.Unsubscribe<RedoPerformedEvent>(_onRedo);
+        }
+        base.Dispose(disposing);
+    }
+
+    #endregion
+
+    #region Event handlers
+
+    private void OnGameObjectSelected(GameObjectSelectedEvent evt)
+    {
+        if (InvokeRequired) { BeginInvoke(() => OnGameObjectSelected(evt)); return; }
+        _currentObject = evt.GameObject;
+        RebuildContent();
+    }
+
+    private void RebuildSafe()
+    {
+        if (InvokeRequired) { BeginInvoke(RebuildContent); return; }
+        RebuildContent();
+    }
+
+    private void OnScrollPanelResized(object? sender, EventArgs e)
+    {
+        int w = ContentWidth();
+        foreach (Control c in _scrollPanel.Controls)
+            c.Width = w;
+    }
+
+    #endregion
+
+    #region Content building
+
+    private void RebuildContent()
+    {
+        _suppressUpdate = true;
+        _scrollPanel.SuspendLayout();
+        _scrollPanel.Controls.Clear();
+
+        if (_currentObject is null)
+        {
+            Label placeholder = new Label
+            {
+                Text      = "Nothing selected",
+                Dock      = DockStyle.Fill,
+                TextAlign = System.Drawing.ContentAlignment.MiddleCenter,
+                ForeColor = System.Drawing.SystemColors.GrayText,
+            };
+            _scrollPanel.Controls.Add(placeholder);
+            _scrollPanel.ResumeLayout();
+            _suppressUpdate = false;
+            return;
+        }
+
+        int y     = SidePadding;
+        int width = ContentWidth();
+
+        // Prefab header (only when the object is a prefab instance)
+        if (_currentObject.PrefabPath is not null && _prefabManager is not null)
+        {
+            Control prefabHeader = BuildPrefabHeader(_currentObject);
+            prefabHeader.Location = new System.Drawing.Point(SidePadding, y);
+            prefabHeader.Width    = width;
+            _scrollPanel.Controls.Add(prefabHeader);
+            y += prefabHeader.Height + SectionGap;
+        }
+
+        // Transform section
+        Control transformSection = BuildTransformSection(_currentObject);
+        transformSection.Location = new System.Drawing.Point(SidePadding, y);
+        transformSection.Width    = width;
+        _scrollPanel.Controls.Add(transformSection);
+        y += transformSection.Height + SectionGap;
+
+        // One section per behaviour
+        for (int i = 0; i < _currentObject.Behaviours.Count; i++)
+        {
+            EditorBehaviour b = _currentObject.Behaviours[i];
+            Control section   = BuildBehaviourSection(b, _currentObject);
+            section.Location  = new System.Drawing.Point(SidePadding, y);
+            section.Width     = width;
+            _scrollPanel.Controls.Add(section);
+            y += section.Height + SectionGap;
+        }
+
+        // Add Behaviour button
+        Button addBtn = new Button
+        {
+            Text     = "+ Add Behaviour",
+            Height   = 28,
+            Location = new System.Drawing.Point(SidePadding, y),
+            Width    = width,
+        };
+        addBtn.Click += OnAddBehaviourClick;
+        _scrollPanel.Controls.Add(addBtn);
+
+        _scrollPanel.ResumeLayout();
+        _suppressUpdate = false;
+    }
+
+    private int ContentWidth() =>
+        Math.Max(0, _scrollPanel.ClientSize.Width - SidePadding * 2 - SystemInformation.VerticalScrollBarWidth);
+
+    #endregion
+
+    #region Transform section
+
+    private Control BuildTransformSection(EditorGameObject obj)
+    {
+        GroupBox grp = new GroupBox
+        {
+            Text    = "Transform",
+            Height  = 24 + RowHeight * 3 + 12,
+            Padding = new System.Windows.Forms.Padding(4),
+        };
+
+        TableLayoutPanel table = new TableLayoutPanel
+        {
+            Dock        = DockStyle.Fill,
+            ColumnCount = 2,
+            RowCount    = 3,
+            Padding     = new System.Windows.Forms.Padding(0),
+        };
+        table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, LabelWidth));
+        table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+        table.RowStyles.Add(new RowStyle(SizeType.Absolute, RowHeight));
+        table.RowStyles.Add(new RowStyle(SizeType.Absolute, RowHeight));
+        table.RowStyles.Add(new RowStyle(SizeType.Absolute, RowHeight));
+
+        // Position
+        table.Controls.Add(MakeLabel("Position"), 0, 0);
+        table.Controls.Add(MakeVec2Control(
+            obj.Position.X, obj.Position.Y,
+            (x, y) =>
+            {
+                if (_suppressUpdate) return;
+                _context!.Commands.Execute(new MoveEntityCommand(obj, new EditorVector2(x, y)));
+            }), 1, 0);
+
+        // Rotation
+        table.Controls.Add(MakeLabel("Rotation"), 0, 1);
+        table.Controls.Add(MakeFloatControl(
+            obj.Rotation, -360f, 360f,
+            v =>
+            {
+                if (_suppressUpdate) return;
+                _context!.Commands.Execute(new RotateEntityCommand(obj, v));
+            }), 1, 1);
+
+        // Scale
+        table.Controls.Add(MakeLabel("Scale"), 0, 2);
+        table.Controls.Add(MakeVec2Control(
+            obj.Scale.X, obj.Scale.Y,
+            (x, y) =>
+            {
+                if (_suppressUpdate) return;
+                _context!.Commands.Execute(new ScaleEntityCommand(obj, new EditorVector2(x, y)));
+            }), 1, 2);
+
+        grp.Controls.Add(table);
+        return grp;
+    }
+
+    #endregion
+
+    #region Behaviour section
+
+    private Control BuildBehaviourSection(EditorBehaviour behaviour, EditorGameObject owner)
+    {
+        string shortName = ExtractShortName(behaviour.TypeName);
+
+        // Outer panel that stacks header + body
+        Panel outerPanel = new Panel { Padding = new System.Windows.Forms.Padding(0) };
+
+        // --- Header ---
+        Panel header = new Panel
+        {
+            Dock      = DockStyle.Top,
+            Height    = 28,
+            BackColor = System.Drawing.SystemColors.ControlDark,
+            Padding   = new System.Windows.Forms.Padding(2),
+        };
+
+        Label nameLabel = new Label
+        {
+            Text      = shortName,
+            Dock      = DockStyle.Left,
+            AutoSize  = false,
+            Width     = 160,
+            TextAlign = System.Drawing.ContentAlignment.MiddleLeft,
+        };
+
+        CheckBox enabledChk = new CheckBox
+        {
+            Text    = "On",
+            Checked = behaviour.Enabled,
+            Dock    = DockStyle.Left,
+            Width   = 44,
+        };
+        enabledChk.CheckedChanged += (_, _) =>
+        {
+            if (_suppressUpdate) return;
+            bool prev = behaviour.Enabled;
+            bool next = enabledChk.Checked;
+            _context!.Commands.Execute(new SetPropertyCommand<bool>(
+                "Set Behaviour Enabled", prev, next, v => behaviour.Enabled = v));
+        };
+
+        Button removeBtn = new Button
+        {
+            Text  = "×",
+            Dock  = DockStyle.Right,
+            Width = 24,
+        };
+        EditorBehaviour capturedBehaviour = behaviour;
+        removeBtn.Click += (_, _) =>
+        {
+            if (_currentObject is null) return;
+            _context!.Commands.Execute(new RemoveBehaviourCommand(_currentObject, capturedBehaviour));
+            RebuildContent();
+        };
+
+        header.Controls.Add(removeBtn);
+        header.Controls.Add(enabledChk);
+        header.Controls.Add(nameLabel);
+
+        // --- Body (properties) ---
+        List<(string label, Control ctrl)> rows = BuildPropertyRows(behaviour, owner);
+        int bodyHeight = rows.Count * RowHeight + 8;
+
+        Panel body = new Panel
+        {
+            Dock    = DockStyle.Top,
+            Height  = bodyHeight,
+            Padding = new System.Windows.Forms.Padding(4, 2, 4, 2),
+        };
+
+        for (int i = 0; i < rows.Count; i++)
+        {
+            Label lbl = MakeLabel(rows[i].label);
+            lbl.Location  = new System.Drawing.Point(4, i * RowHeight + 2);
+            lbl.Width     = LabelWidth;
+            body.Controls.Add(lbl);
+
+            Control ctrl = rows[i].ctrl;
+            ctrl.Location = new System.Drawing.Point(LabelWidth + 4, i * RowHeight + 2);
+            ctrl.Width    = body.Width - LabelWidth - 12;
+            body.Controls.Add(ctrl);
+        }
+
+        // Add body first, then header (DockStyle.Top: last-added = topmost)
+        outerPanel.Controls.Add(body);
+        outerPanel.Controls.Add(header);
+        outerPanel.Height = 28 + bodyHeight;
+
+        return outerPanel;
+    }
+
+    private List<(string, Control)> BuildPropertyRows(EditorBehaviour behaviour, EditorGameObject owner)
+    {
+        List<(string, Control)> rows = [];
+
+        if (_registry is null || string.IsNullOrEmpty(behaviour.TypeName)) return rows;
+        if (!_registry.RegisteredTypes.TryGetValue(behaviour.TypeName, out Type? type)) return rows;
+
+        PropertyInfo[] props = type.GetProperties(BindingFlags.Public | BindingFlags.Instance);
+        for (int i = 0; i < props.Length; i++)
+        {
+            PropertyInfo prop = props[i];
+            EditorPropertyAttribute? attr = prop.GetCustomAttribute<EditorPropertyAttribute>();
+            if (attr is null) continue;
+
+            string label = attr.Label ?? prop.Name;
+            Control ctrl = CreateControlForProperty(prop, attr, behaviour, owner);
+            rows.Add((label, ctrl));
+        }
+        return rows;
+    }
+
+    private Control CreateControlForProperty(
+        PropertyInfo prop,
+        EditorPropertyAttribute attr,
+        EditorBehaviour behaviour,
+        EditorGameObject owner)
+    {
+        Type pType = prop.PropertyType;
+
+        if (pType == typeof(bool))
+        {
+            bool current = behaviour.Properties.TryGetValue(prop.Name, out JsonElement el)
+                ? el.GetBoolean() : false;
+            CheckBox chk = new CheckBox { Checked = current };
+            chk.CheckedChanged += (_, _) =>
+            {
+                bool prev = behaviour.Properties.TryGetValue(prop.Name, out JsonElement prevEl)
+                    ? prevEl.GetBoolean() : !chk.Checked;
+                JsonElement newEl = JsonDocument.Parse(chk.Checked ? "true" : "false").RootElement;
+                _context!.Commands.Execute(new SetPropertyCommand<JsonElement>(
+                    $"Set {prop.Name}", prevEl, newEl,
+                    v => behaviour.Properties[prop.Name] = v));
+            };
+            return chk;
+        }
+
+        if (pType == typeof(string))
+        {
+            string current = behaviour.Properties.TryGetValue(prop.Name, out JsonElement el)
+                ? el.GetString() ?? string.Empty : string.Empty;
+            TextBox tb = new TextBox { Text = current };
+            tb.Leave += (_, _) =>
+            {
+                string prev = behaviour.Properties.TryGetValue(prop.Name, out JsonElement prevEl)
+                    ? prevEl.GetString() ?? string.Empty : string.Empty;
+                if (prev == tb.Text) return;
+                JsonElement newEl = JsonDocument.Parse($"\"{tb.Text}\"").RootElement;
+                _context!.Commands.Execute(new SetPropertyCommand<JsonElement>(
+                    $"Set {prop.Name}", prevEl, newEl,
+                    v => behaviour.Properties[prop.Name] = v));
+            };
+            return tb;
+        }
+
+        if (pType == typeof(float) || pType == typeof(int))
+        {
+            float current = behaviour.Properties.TryGetValue(prop.Name, out JsonElement el)
+                ? el.GetSingle() : 0f;
+            float min = attr.Min == float.MinValue ? -1_000_000f : attr.Min;
+            float max = attr.Max == float.MaxValue ?  1_000_000f : attr.Max;
+            return MakeFloatControl(current, min, max, v =>
+            {
+                if (_suppressUpdate) return;
+                float prev = behaviour.Properties.TryGetValue(prop.Name, out JsonElement prevEl)
+                    ? prevEl.GetSingle() : 0f;
+                if (Math.Abs(prev - v) < 0.0001f) return;
+                JsonElement newEl = JsonDocument.Parse(v.ToString("R", System.Globalization.CultureInfo.InvariantCulture)).RootElement;
+                _context!.Commands.Execute(new SetPropertyCommand<JsonElement>(
+                    $"Set {prop.Name}", prevEl, newEl,
+                    ev => behaviour.Properties[prop.Name] = ev));
+            });
+        }
+
+        if (pType.IsEnum)
+        {
+            ComboBox combo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList };
+            string[] names = Enum.GetNames(pType);
+            for (int i = 0; i < names.Length; i++) combo.Items.Add(names[i]);
+
+            if (behaviour.Properties.TryGetValue(prop.Name, out JsonElement enumEl))
+                combo.SelectedItem = enumEl.GetString();
+            if (combo.SelectedIndex < 0 && combo.Items.Count > 0)
+                combo.SelectedIndex = 0;
+
+            combo.SelectedIndexChanged += (_, _) =>
+            {
+                string? selected = combo.SelectedItem as string;
+                if (selected is null) return;
+                JsonElement prev = behaviour.Properties.TryGetValue(prop.Name, out JsonElement prevEl)
+                    ? prevEl : default;
+                JsonElement newEl = JsonDocument.Parse($"\"{selected}\"").RootElement;
+                _context!.Commands.Execute(new SetPropertyCommand<JsonElement>(
+                    $"Set {prop.Name}", prev, newEl,
+                    v => behaviour.Properties[prop.Name] = v));
+            };
+            return combo;
+        }
+
+        // Fallback: read-only text box
+        TextBox fallback = new TextBox
+        {
+            ReadOnly  = true,
+            Text      = behaviour.Properties.TryGetValue(prop.Name, out JsonElement fallEl)
+                        ? fallEl.ToString() : "(unsupported type)",
+        };
+        return fallback;
+    }
+
+    #endregion
+
+    #region Add Behaviour
+
+    private void OnAddBehaviourClick(object? sender, EventArgs e)
+    {
+        if (_currentObject is null || _registry is null) return;
+        using AddBehaviourDialog dlg = new AddBehaviourDialog(_registry);
+        if (dlg.ShowDialog(this) != DialogResult.OK) return;
+        if (dlg.SelectedTypeName is null) return;
+
+        EditorBehaviour newBehaviour = new() { TypeName = dlg.SelectedTypeName, Enabled = true };
+        _context!.Commands.Execute(new AddBehaviourCommand(_currentObject, newBehaviour));
+        _context.EventBus.Publish(new BehaviourAddedEvent(_currentObject, newBehaviour));
+        RebuildContent();
+    }
+
+    #endregion
+
+    #region Control factories
+
+    private static Label MakeLabel(string text) => new Label
+    {
+        Text      = text,
+        TextAlign = System.Drawing.ContentAlignment.MiddleRight,
+        AutoSize  = false,
+        Height    = RowHeight,
+    };
+
+    private Panel MakeFloatControl(float value, float min, float max, Action<float> onChange)
+    {
+        Panel panel = new Panel { Height = RowHeight };
+        NumericUpDown num = CreateNumericUpDown((decimal)value,
+            (decimal)Math.Max(min, (float)decimal.MinValue),
+            (decimal)Math.Min(max, (float)decimal.MaxValue), 3);
+        num.Dock = DockStyle.Fill;
+        num.ValueChanged += (_, _) => onChange((float)num.Value);
+        panel.Controls.Add(num);
+        return panel;
+    }
+
+    private Panel MakeVec2Control(float x, float y, Action<float, float> onChange)
+    {
+        Panel panel = new Panel { Height = RowHeight };
+
+        Label lx = new Label { Text = "X", Width = 14, Dock = DockStyle.Left, TextAlign = System.Drawing.ContentAlignment.MiddleLeft };
+        NumericUpDown nx = CreateNumericUpDown((decimal)x, -1_000_000m, 1_000_000m, 3);
+        nx.Width = NumericWidth;
+        nx.Dock  = DockStyle.Left;
+
+        Label ly = new Label { Text = "Y", Width = 14, Dock = DockStyle.Left, TextAlign = System.Drawing.ContentAlignment.MiddleLeft };
+        NumericUpDown ny = CreateNumericUpDown((decimal)y, -1_000_000m, 1_000_000m, 3);
+        ny.Dock = DockStyle.Fill;
+
+        // All controls added left to right; last added is Fill
+        panel.Controls.Add(ny);
+        panel.Controls.Add(ly);
+        panel.Controls.Add(nx);
+        panel.Controls.Add(lx);
+
+        nx.ValueChanged += (_, _) => onChange((float)nx.Value, (float)ny.Value);
+        ny.ValueChanged += (_, _) => onChange((float)nx.Value, (float)ny.Value);
+        return panel;
+    }
+
+    private static NumericUpDown CreateNumericUpDown(decimal value, decimal min, decimal max, int decimals)
+    {
+        NumericUpDown num = new NumericUpDown
+        {
+            Minimum       = min,
+            Maximum       = max,
+            DecimalPlaces = decimals,
+            Value         = Math.Clamp(value, min, max),
+            Increment     = 0.1m,
+        };
+        return num;
+    }
+
+    #endregion
+
+    #region Prefab header
+
+    private Control BuildPrefabHeader(EditorGameObject obj)
+    {
+        string fileName = Path.GetFileName(obj.PrefabPath ?? string.Empty);
+
+        Panel panel = new Panel
+        {
+            Height    = 32,
+            BackColor = System.Drawing.Color.FromArgb(50, 100, 180),
+            Padding   = new System.Windows.Forms.Padding(4, 2, 4, 2),
+        };
+
+        Label label = new Label
+        {
+            Text      = $"Prefab: {fileName}",
+            Dock      = DockStyle.Left,
+            Width     = 200,
+            TextAlign = System.Drawing.ContentAlignment.MiddleLeft,
+            ForeColor = System.Drawing.Color.White,
+        };
+
+        Button applyBtn = new Button
+        {
+            Text  = "Apply",
+            Dock  = DockStyle.Right,
+            Width = 55,
+        };
+        applyBtn.Click += (_, _) =>
+        {
+            if (obj.PrefabPath is null || _prefabManager is null) return;
+            _context!.Commands.Execute(new ApplyPrefabCommand(obj, obj.PrefabPath, _prefabManager));
+        };
+
+        Button revertBtn = new Button
+        {
+            Text  = "Revert",
+            Dock  = DockStyle.Right,
+            Width = 55,
+        };
+        revertBtn.Click += (_, _) =>
+        {
+            if (obj.PrefabPath is null || _prefabManager is null) return;
+            _context!.Commands.Execute(new RevertPrefabCommand(obj, obj.PrefabPath, _prefabManager));
+            RebuildContent();
+        };
+
+        panel.Controls.Add(applyBtn);
+        panel.Controls.Add(revertBtn);
+        panel.Controls.Add(label);
+        return panel;
+    }
+
+    #endregion
+
+    #region Helpers
+
+    private static string ExtractShortName(string typeName)
+    {
+        if (string.IsNullOrEmpty(typeName)) return "(unknown)";
+        int dot = typeName.LastIndexOf('.');
+        return dot >= 0 ? typeName[(dot + 1)..] : typeName;
+    }
+
+    #endregion
+}
