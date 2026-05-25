@@ -18,7 +18,7 @@ public sealed class GizmoRenderer : IDisposable
     private static readonly XnaColor AxisXColor      = new(220, 60, 60);
     private static readonly XnaColor AxisYColor      = new(60, 200, 60);
     private static readonly XnaColor AxisXYColor     = new(230, 200, 40);
-    private static readonly XnaColor RotateColor     = XnaColor.White;
+    private static readonly XnaColor RotateColor     = new(255, 210, 80);
 
     // ── Drawing constants ────────────────────────────────────────────────────
     private const float LineThickness = 2.5f;
@@ -83,7 +83,7 @@ public sealed class GizmoRenderer : IDisposable
             DrawBoundingBox(objScreen, selected.Scale.X, selected.Scale.Y, zoom);
 
             if (_ctrl.Mode != GizmoMode.Select)
-                DrawGizmoHandles(_ctrl.Mode, objScreen);
+                DrawGizmoHandles(_ctrl.Mode, objScreen, selected.Rotation);
         }
         catch { /* ignore handle draw errors */ }
         finally
@@ -147,12 +147,12 @@ public sealed class GizmoRenderer : IDisposable
 
     // ── Gizmo handles ────────────────────────────────────────────────────────
 
-    private void DrawGizmoHandles(GizmoMode mode, XnaVector2 origin)
+    private void DrawGizmoHandles(GizmoMode mode, XnaVector2 origin, float rotationDegrees)
     {
         switch (mode)
         {
             case GizmoMode.Move:   DrawMoveGizmo(origin);   break;
-            case GizmoMode.Rotate: DrawRotateGizmo(origin); break;
+            case GizmoMode.Rotate: DrawRotateGizmo(origin, rotationDegrees); break;
             case GizmoMode.Scale:  DrawScaleGizmo(origin);  break;
         }
     }
@@ -176,7 +176,7 @@ public sealed class GizmoRenderer : IDisposable
         FillRect(new XnaRect((int)(origin.X + 12), (int)(origin.Y - 28), 16, 16), AxisXYColor);
     }
 
-    private void DrawRotateGizmo(XnaVector2 origin)
+    private void DrawRotateGizmo(XnaVector2 origin, float rotationDegrees)
     {
         const int segments   = 48;
         float     angleStep  = MathHelper.TwoPi / segments;
@@ -189,6 +189,13 @@ public sealed class GizmoRenderer : IDisposable
             XnaVector2 p2 = origin + new XnaVector2(MathF.Cos(a2), MathF.Sin(a2)) * GizmoController.RotateRadius;
             DrawLine(p1, p2, RotateColor, LineThickness);
         }
+
+        float rotationRad = MathHelper.ToRadians(rotationDegrees);
+        XnaVector2 dir = new(MathF.Cos(rotationRad), MathF.Sin(rotationRad));
+        XnaVector2 handlePos = origin + dir * GizmoController.RotateRadius;
+
+        DrawLine(origin, handlePos, RotateColor, 1.5f);
+        FillRect(new XnaRect((int)(handlePos.X - 5), (int)(handlePos.Y - 5), 10, 10), RotateColor);
     }
 
     private void DrawScaleGizmo(XnaVector2 origin)

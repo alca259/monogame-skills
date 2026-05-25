@@ -136,6 +136,24 @@ public sealed class GizmoController
                 break;
             }
 
+            case GizmoDragAxis.ScaleX:
+            {
+                float delta = dx * 0.02f;
+                selected.Scale = new EditorVector2(
+                    Math.Max(0.01f, scaleStartX + delta),
+                    Math.Max(0.01f, scaleStartY));
+                break;
+            }
+
+            case GizmoDragAxis.ScaleY:
+            {
+                float delta = -dy * 0.02f;
+                selected.Scale = new EditorVector2(
+                    Math.Max(0.01f, scaleStartX),
+                    Math.Max(0.01f, scaleStartY + delta));
+                break;
+            }
+
             case GizmoDragAxis.ScaleUniform:
             {
                 float dist  = MathF.Sqrt(dx * dx + dy * dy);
@@ -185,6 +203,8 @@ public sealed class GizmoController
                 => new MoveEntityCommand(selected, startPos, selected.Position),
             GizmoDragAxis.Rotate
                 => new RotateEntityCommand(selected, rotStart, selected.Rotation),
+            GizmoDragAxis.ScaleX or GizmoDragAxis.ScaleY
+                => new ScaleEntityCommand(selected, startScale, selected.Scale),
             GizmoDragAxis.ScaleUniform
                 => new ScaleEntityCommand(selected, startScale, selected.Scale),
             _ => null,
@@ -243,10 +263,10 @@ public sealed class GizmoController
         if (InRect(px, py, ox - h, oy - h, h * 2, h * 2)) return GizmoDragAxis.ScaleUniform;
 
         // X-end handle
-        if (InRect(px, py, ox + ArrowLength - h, oy - h, h * 2, h * 2)) return GizmoDragAxis.X;
+        if (InRect(px, py, ox + ArrowLength - h, oy - h, h * 2, h * 2)) return GizmoDragAxis.ScaleX;
 
         // Y-end handle
-        if (InRect(px, py, ox - h, oy - ArrowLength - h, h * 2, h * 2)) return GizmoDragAxis.Y;
+        if (InRect(px, py, ox - h, oy - ArrowLength - h, h * 2, h * 2)) return GizmoDragAxis.ScaleY;
 
         return GizmoDragAxis.None;
     }
