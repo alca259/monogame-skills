@@ -93,6 +93,8 @@ public sealed partial class EditorForm : Form
         _viewport.RenderFrame += OnViewportRenderFrame;
         _gameViewport.RenderFrame += OnGameViewportRenderFrame;
         _gameViewport.ClearColor = new Microsoft.Xna.Framework.Color(15, 15, 25); // dark blue — distinct from scene
+        _gameViewport.IsActive   = false; // game tab not selected at startup
+        _centerTabControl.SelectedIndexChanged += OnCenterTabChanged;
         _toolbarTable.Resize  += (_, _) => CenterPlaybackStrip();
 
         // Gizmo mouse interaction
@@ -104,12 +106,17 @@ public sealed partial class EditorForm : Form
         _gizmoRenderer = new GizmoRenderer(_gizmoCtrl);
 
         // Initialize panels
+        _consolePanel.Initialize(_context);
         _hierarchyPanel.Initialize(_context, _prefabManager);
         _inspectorPanel.Initialize(_context, _registry, _prefabManager);
         _assetBrowserPanel.Initialize(_context);
         _sceneManagerPanel.Initialize(_context);
         _localizationPanel.Initialize(_context);
         _inputMapEditorPanel.Initialize(_context);
+
+        _context.EventBus.Subscribe<BehaviourAddedEvent>(OnBehaviourAdded);
+        _context.EventBus.Subscribe<InputMapLoadedEvent>(OnInputMapLoaded);
+        _context.EventBus.Subscribe<LocalizationLoadedEvent>(OnLocalizationLoaded);
 
         // Build menus programmatically (avoids Designer.cs C#-version concerns)
         BuildFileMenuExtras();
@@ -140,6 +147,9 @@ public sealed partial class EditorForm : Form
         _context.EventBus.Unsubscribe<ProjectOpenedEvent>(OnProjectOpened);
         _context.EventBus.Unsubscribe<SceneLoadedEvent>(OnSceneLoaded);
         _context.EventBus.Unsubscribe<SceneDirtyChangedEvent>(OnSceneDirtyChanged);
+        _context.EventBus.Unsubscribe<BehaviourAddedEvent>(OnBehaviourAdded);
+        _context.EventBus.Unsubscribe<InputMapLoadedEvent>(OnInputMapLoaded);
+        _context.EventBus.Unsubscribe<LocalizationLoadedEvent>(OnLocalizationLoaded);
         _contentWatcher.Dispose();
         _gizmoRenderer?.Dispose();
         _editRenderer?.Dispose();
@@ -1226,6 +1236,24 @@ public sealed partial class EditorForm : Form
 
     private void OnFileExitClick(object? sender, EventArgs e) => Close();
 
+    private void OnBehaviourAdded(BehaviourAddedEvent evt)
+    {
+        if (InvokeRequired) { BeginInvoke(() => OnBehaviourAdded(evt)); return; }
+        _consolePanel.AppendLine($"[Editor] Added '{evt.Behaviour.TypeName}' to '{evt.GameObject.Name}'.");
+    }
+
+    private void OnInputMapLoaded(InputMapLoadedEvent evt)
+    {
+        if (InvokeRequired) { BeginInvoke(() => OnInputMapLoaded(evt)); return; }
+        _consolePanel.AppendLine($"[Input] Input map loaded — {evt.Model.Actions.Count} action(s).");
+    }
+
+    private void OnLocalizationLoaded(LocalizationLoadedEvent evt)
+    {
+        if (InvokeRequired) { BeginInvoke(() => OnLocalizationLoaded(evt)); return; }
+        _consolePanel.AppendLine($"[Localization] Loaded — {evt.Model.Keys.Count} key(s).");
+    }
+
     private void OnProjectOpened(ProjectOpenedEvent evt)
     {
         if (InvokeRequired) { BeginInvoke(() => OnProjectOpened(evt)); return; }
@@ -1290,6 +1318,13 @@ public sealed partial class EditorForm : Form
     #endregion
 
     #region Viewport rendering
+
+    private void OnCenterTabChanged(object? sender, EventArgs e)
+    {
+        bool sceneVisible = _centerTabControl.SelectedTab == _sceneTab;
+        _viewport.IsActive     = sceneVisible;
+        _gameViewport.IsActive = !sceneVisible;
+    }
 
     private void OnViewportRenderFrame(object? sender, RenderEventArgs e)
     {

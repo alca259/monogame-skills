@@ -41,6 +41,12 @@ public sealed class MonoGameControl : Control
     /// <summary>Editor camera used to transform the viewport.</summary>
     public EditorCamera2D Camera { get; } = new();
 
+    /// <summary>
+    /// When <c>false</c> the render loop ticks but skips all drawing.
+    /// Set to <c>false</c> for the inactive tab so only the visible viewport renders.
+    /// </summary>
+    public volatile bool IsActive = true;
+
     /// <summary>Color used to clear the render target at the start of each frame.</summary>
     [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
     public Microsoft.Xna.Framework.Color ClearColor { get; set; } = new Microsoft.Xna.Framework.Color(30, 30, 30);
@@ -243,6 +249,7 @@ public sealed class MonoGameControl : Control
 
     private void DoRender(TimeSpan elapsed)
     {
+        if (!IsActive) return;
         if (_graphicsDevice == null || _swapChain == null || _swapChain.IsDisposed)
             return;
 

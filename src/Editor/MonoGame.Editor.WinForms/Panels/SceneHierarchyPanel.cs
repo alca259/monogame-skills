@@ -69,9 +69,9 @@ public sealed class SceneHierarchyPanel : UserControl
         // ── Context menu ─────────────────────────────────────────────────
         _createEmptyItem  = new ToolStripMenuItem("Create Empty");
         _createChildItem  = new ToolStripMenuItem("Create Child");
-        _duplicateItem    = new ToolStripMenuItem("Duplicate\tCtrl+D");
-        _renameItem       = new ToolStripMenuItem("Rename\tF2");
-        _deleteItem       = new ToolStripMenuItem("Delete\tDel");
+        _duplicateItem    = new ToolStripMenuItem("Duplicate") { ShortcutKeys = Keys.Control | Keys.D, ShowShortcutKeys = true };
+        _renameItem       = new ToolStripMenuItem("Rename") { ShortcutKeys = Keys.F2, ShowShortcutKeys = true };
+        _deleteItem       = new ToolStripMenuItem("Delete") { ShortcutKeys = Keys.Delete, ShowShortcutKeys = true };
         _setActiveItem    = new ToolStripMenuItem("Toggle Active");
         _saveAsPrefabItem = new ToolStripMenuItem("Save as Prefab...");
         _applyPrefabItem  = new ToolStripMenuItem("Apply Prefab");
