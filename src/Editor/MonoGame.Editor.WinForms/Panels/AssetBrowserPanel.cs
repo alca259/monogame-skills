@@ -32,6 +32,7 @@ public sealed class AssetBrowserPanel : UserControl
     private const int IconInputMap  = 9;
     private const int IconScript    = 10;
     private const int IconFolder    = 11;
+    private const int IconGenerated = 12;
 
     #endregion
 
@@ -39,15 +40,24 @@ public sealed class AssetBrowserPanel : UserControl
 
     private EditorContext? _context;
     private string _contentRoot = string.Empty;
+    private string _currentFolder = string.Empty;
+    private bool _largeIconMode;
 
-    private readonly SplitContainer _outerSplit;
-    private readonly TreeView       _folderTree;
-    private readonly SplitContainer _rightSplit;
-    private readonly ListView       _contentView;
-    private readonly Panel          _previewPanel;
-    private readonly PictureBox     _previewImage;
-    private readonly Label          _previewInfo;
-    private readonly ImageList      _typeIcons;
+    private readonly SplitContainer    _outerSplit;
+    private readonly TreeView          _folderTree;
+    private readonly SplitContainer    _rightSplit;
+    private readonly ListView          _contentView;
+    private readonly Panel             _previewPanel;
+    private readonly PictureBox        _previewImage;
+    private readonly Label             _previewInfo;
+    private readonly ImageList         _typeIcons;
+    private readonly ImageList         _largeIcons;
+    private readonly Panel             _topBar;
+    private readonly TextBox           _filterBox;
+    private readonly Button            _viewToggleBtn;
+    private readonly FlowLayoutPanel   _breadcrumb;
+    private readonly ContextMenuStrip  _itemContextMenu;
+    private readonly System.Windows.Forms.Timer _searchDebounce;
 
     #endregion
 
@@ -56,30 +66,95 @@ public sealed class AssetBrowserPanel : UserControl
     /// <summary>Initializes the panel and builds the UI.</summary>
     public AssetBrowserPanel()
     {
-        _typeIcons = BuildIconList();
+        _typeIcons  = BuildIconList(16);
+        _largeIcons = BuildLargeIconList();
+
+        // ── Breadcrumb ────────────────────────────────────────────────────
+        _breadcrumb = new FlowLayoutPanel
+        {
+            Dock      = DockStyle.Top,
+            Height    = 22,
+            AutoSize  = false,
+            Padding   = new Padding(2, 0, 2, 0),
+        };
+
+        // ── Top bar (filter + view toggle) ────────────────────────────────
+        _filterBox = new TextBox
+        {
+            Dock             = DockStyle.Fill,
+            PlaceholderText  = "Filter assets...",
+            BorderStyle      = BorderStyle.FixedSingle,
+        };
+        _viewToggleBtn = new Button
+        {
+            Text      = "⊞",
+            Width     = 28,
+            Dock      = DockStyle.Right,
+            FlatStyle = FlatStyle.Flat,
+        };
+        _topBar = new Panel { Dock = DockStyle.Top, Height = 28, Padding = new Padding(2) };
+        _topBar.Controls.Add(_filterBox);
+        _topBar.Controls.Add(_viewToggleBtn);
+
+        // ── Context menu ─────────────────────────────────────────────────
+        ToolStripMenuItem openExternalItem    = new("Open with External Editor");
+        ToolStripMenuItem revealInExplorerItem = new("Reveal in Explorer");
+        ToolStripMenuItem renameItem          = new("Rename");
+        ToolStripMenuItem deleteItem          = new("Delete");
+        ToolStripMenuItem copyPathItem        = new("Copy Relative Path");
+
+        _itemContextMenu = new ContextMenuStrip();
+        _itemContextMenu.Items.AddRange(new ToolStripItem[]
+        {
+            openExternalItem,
+            revealInExplorerItem,
+            new ToolStripSeparator(),
+            renameItem,
+            deleteItem,
+            new ToolStripSeparator(),
+            copyPathItem,
+        });
+
+        openExternalItem.Click     += OnOpenExternal;
+        revealInExplorerItem.Click += OnRevealInExplorer;
+        renameItem.Click           += OnRenameItem;
+        deleteItem.Click           += OnDeleteItem;
+        copyPathItem.Click         += OnCopyRelativePath;
+
+        // ── Debounce timer ────────────────────────────────────────────────
+        _searchDebounce = new System.Windows.Forms.Timer { Interval = 150 };
+        _searchDebounce.Tick += (_, _) =>
+        {
+            _searchDebounce.Stop();
+            if (!string.IsNullOrEmpty(_currentFolder))
+                ShowFolderContents(_currentFolder);
+        };
+        _filterBox.TextChanged += (_, _) => { _searchDebounce.Stop(); _searchDebounce.Start(); };
 
         // ── Folder tree (left) ───────────────────────────────────────────
         _folderTree = new TreeView
         {
-            Dock        = DockStyle.Fill,
+            Dock          = DockStyle.Fill,
             HideSelection = false,
-            ShowLines   = true,
+            ShowLines     = true,
             ShowPlusMinus = true,
-            BorderStyle = BorderStyle.None,
-            ImageList   = _typeIcons,
+            BorderStyle   = BorderStyle.None,
+            ImageList     = _typeIcons,
         };
 
         // ── File list (top-right) ─────────────────────────────────────────
         _contentView = new ListView
         {
-            Dock            = DockStyle.Fill,
-            View            = View.Details,
-            FullRowSelect   = true,
-            MultiSelect     = false,
+            Dock             = DockStyle.Fill,
+            View             = View.Details,
+            FullRowSelect    = true,
+            MultiSelect      = false,
             ShowItemToolTips = true,
-            BorderStyle     = BorderStyle.None,
-            SmallImageList  = _typeIcons,
-            AllowDrop       = true,
+            BorderStyle      = BorderStyle.None,
+            SmallImageList   = _typeIcons,
+            LargeImageList   = _largeIcons,
+            AllowDrop        = true,
+            ContextMenuStrip = _itemContextMenu,
         };
         _contentView.Columns.Add("Name", 200);
         _contentView.Columns.Add("Type", 80);
@@ -111,17 +186,24 @@ public sealed class AssetBrowserPanel : UserControl
         _previewPanel.Controls.Add(_previewImage);
 
         // ── Right split (list / preview) ──────────────────────────────────
+        // Wrap list+topbar+breadcrumb in a panel
+        Panel rightTopPanel = new Panel { Dock = DockStyle.Fill };
+        rightTopPanel.Controls.Add(_contentView);
+        rightTopPanel.Controls.Add(_topBar);
+        rightTopPanel.Controls.Add(_breadcrumb);
+
         _rightSplit = new SplitContainer
         {
-            Dock            = DockStyle.Fill,
-            Orientation     = Orientation.Horizontal,
+            Dock             = DockStyle.Fill,
+            Orientation      = Orientation.Horizontal,
             SplitterDistance = 200,
-            Panel1MinSize   = 80,
-            Panel2MinSize   = PreviewHeight,
-            FixedPanel      = FixedPanel.Panel2,
+            Panel1MinSize    = 80,
+            Panel2MinSize    = PreviewHeight,
+            FixedPanel       = FixedPanel.Panel2,
         };
-        _rightSplit.Panel1.Controls.Add(_contentView);
+        _rightSplit.Panel1.Controls.Add(rightTopPanel);
         _rightSplit.Panel2.Controls.Add(_previewPanel);
+        _rightSplit.Panel2Collapsed = true;   // hidden until an asset is selected
 
         // ── Outer split (tree / right) ────────────────────────────────────
         _outerSplit = new SplitContainer
@@ -139,14 +221,15 @@ public sealed class AssetBrowserPanel : UserControl
         AllowDrop = true;
 
         // Wire up
-        _folderTree.AfterSelect    += OnFolderSelected;
-        _folderTree.BeforeExpand   += OnBeforeExpand;
-        _contentView.SelectedIndexChanged += OnContentSelectionChanged;
-        _contentView.ItemDrag      += OnItemDrag;
-        _contentView.DragEnter     += OnDragEnter;
-        _contentView.DragDrop      += OnDragDrop;
-        DragEnter                  += OnDragEnter;
-        DragDrop                   += OnDragDrop;
+        _folderTree.AfterSelect             += OnFolderSelected;
+        _folderTree.BeforeExpand            += OnBeforeExpand;
+        _contentView.SelectedIndexChanged   += OnContentSelectionChanged;
+        _contentView.ItemDrag               += OnItemDrag;
+        _contentView.DragEnter              += OnDragEnter;
+        _contentView.DragDrop               += OnDragDrop;
+        _viewToggleBtn.Click                += OnViewToggle;
+        DragEnter                           += OnDragEnter;
+        DragDrop                            += OnDragDrop;
     }
 
     #endregion
@@ -283,6 +366,11 @@ public sealed class AssetBrowserPanel : UserControl
 
     private void ShowFolderContents(string folderPath)
     {
+        _currentFolder = folderPath;
+        UpdateBreadcrumb(folderPath);
+
+        string filter = _filterBox.Text?.Trim() ?? string.Empty;
+
         _contentView.BeginUpdate();
         _contentView.Items.Clear();
         ClearPreview();
@@ -294,12 +382,29 @@ public sealed class AssetBrowserPanel : UserControl
             for (int i = 0; i < files.Length; i++)
             {
                 AssetInfo info = AssetClassifier.CreateInfo(files[i], _contentRoot);
+                if (!string.IsNullOrEmpty(filter) && !info.Name.Contains(filter, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
                 ListViewItem item = new(info.Name)
                 {
                     Tag        = info,
-                    ImageIndex = TypeToIconIndex(info.Type),
                     ToolTipText = info.RelativePath,
                 };
+
+                bool isGenerated = info.Name.EndsWith(".Generated.cs", StringComparison.OrdinalIgnoreCase)
+                    || (info.Extension.Equals(".cs", StringComparison.OrdinalIgnoreCase)
+                        && info.Name.Contains(".Generated", StringComparison.OrdinalIgnoreCase));
+
+                if (isGenerated)
+                {
+                    item.ImageIndex  = IconGenerated;
+                    item.ForeColor   = System.Drawing.Color.Turquoise;
+                    item.ToolTipText = "Auto-generated by MonoGame Editor — do not edit manually";
+                }
+                else
+                {
+                    item.ImageIndex = TypeToIconIndex(info.Type);
+                }
                 item.SubItems.Add(TypeLabel(info.Type));
                 item.SubItems.Add(FormatSize(info.SizeBytes));
                 _contentView.Items.Add(item);
@@ -314,16 +419,19 @@ public sealed class AssetBrowserPanel : UserControl
     {
         if (_contentView.SelectedItems.Count == 0)
         {
+            _rightSplit.Panel2Collapsed = true;
             ClearPreview();
             return;
         }
 
         if (_contentView.SelectedItems[0].Tag is not AssetInfo info)
         {
+            _rightSplit.Panel2Collapsed = true;
             ClearPreview();
             return;
         }
 
+        _rightSplit.Panel2Collapsed = false;
         ShowPreview(info);
     }
 
@@ -420,6 +528,131 @@ public sealed class AssetBrowserPanel : UserControl
 
     #region Helpers
 
+    private void UpdateBreadcrumb(string folderPath)
+    {
+        _breadcrumb.Controls.Clear();
+        if (string.IsNullOrEmpty(_contentRoot)) return;
+
+        bool insideRoot = folderPath.StartsWith(_contentRoot, StringComparison.OrdinalIgnoreCase);
+        string rootName = Path.GetFileName(_contentRoot);
+        if (string.IsNullOrEmpty(rootName)) rootName = _contentRoot;
+
+        AddBreadcrumbLink(rootName, _contentRoot);
+
+        if (!insideRoot) return;
+
+        string relative = folderPath[_contentRoot.Length..].TrimStart(Path.DirectorySeparatorChar);
+        if (string.IsNullOrEmpty(relative)) return;
+
+        string[] segments = relative.Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
+        string accumulated = _contentRoot;
+        for (int i = 0; i < segments.Length; i++)
+        {
+            accumulated = Path.Combine(accumulated, segments[i]);
+            Label sep = new Label { Text = "›", AutoSize = true, TextAlign = System.Drawing.ContentAlignment.MiddleCenter };
+            _breadcrumb.Controls.Add(sep);
+            string captured = accumulated;
+            AddBreadcrumbLink(segments[i], captured);
+        }
+    }
+
+    private void AddBreadcrumbLink(string text, string path)
+    {
+        LinkLabel lnk = new LinkLabel
+        {
+            Text      = text,
+            AutoSize  = true,
+            Tag       = path,
+            TextAlign = System.Drawing.ContentAlignment.MiddleLeft,
+            LinkColor        = System.Drawing.Color.FromArgb(180, 180, 180),
+            VisitedLinkColor = System.Drawing.Color.FromArgb(140, 140, 140),
+            ActiveLinkColor  = System.Drawing.Color.White,
+        };
+        lnk.LinkClicked += (_, _) =>
+        {
+            if (lnk.Tag is not string target) return;
+            // Navigate tree to this path
+            TreeNode? node = FindFolderNode(_folderTree.Nodes, target);
+            if (node is not null)
+            {
+                _folderTree.SelectedNode = node;
+                ShowFolderContents(target);
+            }
+        };
+        _breadcrumb.Controls.Add(lnk);
+    }
+
+    private static TreeNode? FindFolderNode(TreeNodeCollection nodes, string path)
+    {
+        for (int i = 0; i < nodes.Count; i++)
+        {
+            if (nodes[i].Tag is string p && string.Equals(p, path, StringComparison.OrdinalIgnoreCase))
+                return nodes[i];
+            TreeNode? found = FindFolderNode(nodes[i].Nodes, path);
+            if (found is not null) return found;
+        }
+        return null;
+    }
+
+    private void OnViewToggle(object? sender, EventArgs e)
+    {
+        _largeIconMode = !_largeIconMode;
+        _contentView.View = _largeIconMode ? View.LargeIcon : View.Details;
+        _viewToggleBtn.Text = _largeIconMode ? "☰" : "⊞";
+        if (!string.IsNullOrEmpty(_currentFolder))
+            ShowFolderContents(_currentFolder);
+    }
+
+    private void OnOpenExternal(object? sender, EventArgs e)
+    {
+        if (_contentView.SelectedItems.Count == 0) return;
+        if (_contentView.SelectedItems[0].Tag is not AssetInfo info) return;
+        if (!File.Exists(info.AbsolutePath)) return;
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+        {
+            FileName         = info.AbsolutePath,
+            UseShellExecute  = true,
+        });
+    }
+
+    private void OnRevealInExplorer(object? sender, EventArgs e)
+    {
+        if (_contentView.SelectedItems.Count == 0) return;
+        if (_contentView.SelectedItems[0].Tag is not AssetInfo info) return;
+        System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{info.AbsolutePath}\"");
+    }
+
+    private void OnRenameItem(object? sender, EventArgs e)
+    {
+        if (_contentView.SelectedItems.Count > 0)
+            _contentView.SelectedItems[0].BeginEdit();
+    }
+
+    private void OnDeleteItem(object? sender, EventArgs e)
+    {
+        if (_contentView.SelectedItems.Count == 0) return;
+        if (_contentView.SelectedItems[0].Tag is not AssetInfo info) return;
+        if (MessageBox.Show(this, $"Delete '{info.Name}'?", "Confirm Delete",
+                MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
+        try
+        {
+            File.Delete(info.AbsolutePath);
+            _context?.EventBus.Publish(new AssetImportedEvent(info));
+            ShowFolderContents(_currentFolder);
+        }
+        catch (IOException ex)
+        {
+            MessageBox.Show(this, ex.Message, "Delete Failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private void OnCopyRelativePath(object? sender, EventArgs e)
+    {
+        if (_contentView.SelectedItems.Count == 0) return;
+        if (_contentView.SelectedItems[0].Tag is not AssetInfo info) return;
+        Clipboard.SetText(info.RelativePath);
+    }
+
     private static int TypeToIconIndex(AssetType type) => type switch
     {
         AssetType.Texture   => IconTexture,
@@ -457,28 +690,48 @@ public sealed class AssetBrowserPanel : UserControl
         _            => $"{bytes} B",
     };
 
-    /// <summary>Builds the icon image list with 16×16 colored squares per asset type.</summary>
-    private static ImageList BuildIconList()
+    /// <summary>Builds the icon image list with colored squares per asset type.</summary>
+    private static ImageList BuildIconList(int size)
     {
-        ImageList list = new() { ImageSize = new System.Drawing.Size(16, 16) };
-        list.Images.Add(MakeColorSquare(System.Drawing.Color.Gray));           // 0 Unknown
-        list.Images.Add(MakeColorSquare(System.Drawing.Color.MediumPurple));   // 1 Texture
-        list.Images.Add(MakeColorSquare(System.Drawing.Color.DodgerBlue));     // 2 Audio
-        list.Images.Add(MakeColorSquare(System.Drawing.Color.Goldenrod));      // 3 Font
-        list.Images.Add(MakeColorSquare(System.Drawing.Color.ForestGreen));    // 4 TiledMap
-        list.Images.Add(MakeColorSquare(System.Drawing.Color.CornflowerBlue)); // 5 Scene
-        list.Images.Add(MakeColorSquare(System.Drawing.Color.Orange));         // 6 Prefab
-        list.Images.Add(MakeColorSquare(System.Drawing.Color.HotPink));        // 7 Particles
-        list.Images.Add(MakeColorSquare(System.Drawing.Color.LimeGreen));      // 8 Animation
-        list.Images.Add(MakeColorSquare(System.Drawing.Color.Tomato));         // 9 InputMap
-        list.Images.Add(MakeColorSquare(System.Drawing.Color.Teal));           // 10 Script
-        list.Images.Add(MakeColorSquare(System.Drawing.Color.SaddleBrown));    // 11 Folder
+        ImageList list = new() { ImageSize = new System.Drawing.Size(size, size) };
+        list.Images.Add(MakeColorSquare(System.Drawing.Color.Gray, size));           // 0 Unknown
+        list.Images.Add(MakeColorSquare(System.Drawing.Color.MediumPurple, size));   // 1 Texture
+        list.Images.Add(MakeColorSquare(System.Drawing.Color.DodgerBlue, size));     // 2 Audio
+        list.Images.Add(MakeColorSquare(System.Drawing.Color.Goldenrod, size));      // 3 Font
+        list.Images.Add(MakeColorSquare(System.Drawing.Color.ForestGreen, size));    // 4 TiledMap
+        list.Images.Add(MakeColorSquare(System.Drawing.Color.CornflowerBlue, size)); // 5 Scene
+        list.Images.Add(MakeColorSquare(System.Drawing.Color.Orange, size));         // 6 Prefab
+        list.Images.Add(MakeColorSquare(System.Drawing.Color.HotPink, size));        // 7 Particles
+        list.Images.Add(MakeColorSquare(System.Drawing.Color.LimeGreen, size));      // 8 Animation
+        list.Images.Add(MakeColorSquare(System.Drawing.Color.Tomato, size));         // 9 InputMap
+        list.Images.Add(MakeColorSquare(System.Drawing.Color.Teal, size));           // 10 Script
+        list.Images.Add(MakeColorSquare(System.Drawing.Color.SaddleBrown, size));    // 11 Folder
+        list.Images.Add(MakeColorSquare(System.Drawing.Color.Turquoise, size));      // 12 Generated
         return list;
     }
 
-    private static System.Drawing.Bitmap MakeColorSquare(System.Drawing.Color color)
+    private static ImageList BuildLargeIconList()
     {
-        System.Drawing.Bitmap bmp = new(16, 16);
+        ImageList list = new() { ImageSize = new System.Drawing.Size(64, 64) };
+        list.Images.Add(MakeColorSquare(System.Drawing.Color.Gray, 64));
+        list.Images.Add(MakeColorSquare(System.Drawing.Color.MediumPurple, 64));
+        list.Images.Add(MakeColorSquare(System.Drawing.Color.DodgerBlue, 64));
+        list.Images.Add(MakeColorSquare(System.Drawing.Color.Goldenrod, 64));
+        list.Images.Add(MakeColorSquare(System.Drawing.Color.ForestGreen, 64));
+        list.Images.Add(MakeColorSquare(System.Drawing.Color.CornflowerBlue, 64));
+        list.Images.Add(MakeColorSquare(System.Drawing.Color.Orange, 64));
+        list.Images.Add(MakeColorSquare(System.Drawing.Color.HotPink, 64));
+        list.Images.Add(MakeColorSquare(System.Drawing.Color.LimeGreen, 64));
+        list.Images.Add(MakeColorSquare(System.Drawing.Color.Tomato, 64));
+        list.Images.Add(MakeColorSquare(System.Drawing.Color.Teal, 64));
+        list.Images.Add(MakeColorSquare(System.Drawing.Color.SaddleBrown, 64));
+        list.Images.Add(MakeColorSquare(System.Drawing.Color.Turquoise, 64));        // 12 Generated
+        return list;
+    }
+
+    private static System.Drawing.Bitmap MakeColorSquare(System.Drawing.Color color, int size)
+    {
+        System.Drawing.Bitmap bmp = new(size, size);
         using System.Drawing.Graphics g = System.Drawing.Graphics.FromImage(bmp);
         g.Clear(color);
         return bmp;
@@ -500,6 +753,8 @@ public sealed class AssetBrowserPanel : UserControl
             }
             _previewImage.Image?.Dispose();
             _typeIcons.Dispose();
+            _largeIcons.Dispose();
+            _searchDebounce.Dispose();
         }
         base.Dispose(disposing);
     }

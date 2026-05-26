@@ -1,8 +1,6 @@
 using XnaColor     = Microsoft.Xna.Framework.Color;
 using XnaRect      = Microsoft.Xna.Framework.Rectangle;
 using XnaVector2   = Microsoft.Xna.Framework.Vector2;
-using MonoGame.Editor.Core.Gizmos;
-
 namespace MonoGame.Editor.WinForms.Gizmos;
 
 /// <summary>
@@ -12,13 +10,13 @@ namespace MonoGame.Editor.WinForms.Gizmos;
 public sealed class GizmoRenderer : IDisposable
 {
     // ── Colours ───────────────────────────────────────────────────────────────
-    private static readonly XnaColor GridColor       = new(80, 80, 80, 55);
-    private static readonly XnaColor OriginAxisColor = new(100, 100, 100, 100);
-    private static readonly XnaColor BoundsColor     = new(255, 255, 255, 110);
-    private static readonly XnaColor AxisXColor      = new(220, 60, 60);
-    private static readonly XnaColor AxisYColor      = new(60, 200, 60);
-    private static readonly XnaColor AxisXYColor     = new(230, 200, 40);
-    private static readonly XnaColor RotateColor     = XnaColor.White;
+    private static readonly XnaColor _gridColor       = new(70,  70,  70,  180);
+    private static readonly XnaColor _originAxisColor = new(140, 140, 140, 220);
+    private static readonly XnaColor _boundsColor     = new(255, 255, 255, 110);
+    private static readonly XnaColor _axisXColor      = new(220, 60, 60);
+    private static readonly XnaColor _axisYColor      = new(60, 200, 60);
+    private static readonly XnaColor _axisXYColor     = new(230, 200, 40);
+    private static readonly XnaColor _rotateColor     = new(255, 210, 80);
 
     // ── Drawing constants ────────────────────────────────────────────────────
     private const float LineThickness = 2.5f;
@@ -57,9 +55,15 @@ public sealed class GizmoRenderer : IDisposable
                 transformMatrix: cameraTransform,
                 samplerState: SamplerState.PointClamp,
                 blendState: BlendState.AlphaBlend);
-
-            DrawGrid(cameraTransform, viewW, viewH);
-            _spriteBatch.End();
+            try
+            {
+                DrawGrid(cameraTransform, viewW, viewH);
+            }
+            catch { /* ignore grid draw errors */ }
+            finally
+            {
+                _spriteBatch.End();
+            }
         }
 
         // ── Pass 2: screen-space bounding box + handles ──────────────────────
@@ -72,13 +76,18 @@ public sealed class GizmoRenderer : IDisposable
         _spriteBatch.Begin(
             samplerState: SamplerState.PointClamp,
             blendState: BlendState.AlphaBlend);
+        try
+        {
+            DrawBoundingBox(objScreen, selected.Scale.X, selected.Scale.Y, zoom);
 
-        DrawBoundingBox(objScreen, selected.Scale.X, selected.Scale.Y, zoom);
-
-        if (_ctrl.Mode != GizmoMode.Select)
-            DrawGizmoHandles(_ctrl.Mode, objScreen);
-
-        _spriteBatch.End();
+            if (_ctrl.Mode != GizmoMode.Select)
+                DrawGizmoHandles(_ctrl.Mode, objScreen, selected.Rotation);
+        }
+        catch { /* ignore handle draw errors */ }
+        finally
+        {
+            _spriteBatch.End();
+        }
     }
 
     // ── Grid ─────────────────────────────────────────────────────────────────
@@ -106,14 +115,14 @@ public sealed class GizmoRenderer : IDisposable
         float startY = MathF.Floor(minY / cell) * cell;
 
         for (float x = startX; x <= maxX; x += cell)
-            DrawLine(new XnaVector2(x, minY), new XnaVector2(x, maxY), GridColor, lineW);
+            DrawLine(new XnaVector2(x, minY), new XnaVector2(x, maxY), _gridColor, lineW);
 
         for (float y = startY; y <= maxY; y += cell)
-            DrawLine(new XnaVector2(minX, y), new XnaVector2(maxX, y), GridColor, lineW);
+            DrawLine(new XnaVector2(minX, y), new XnaVector2(maxX, y), _gridColor, lineW);
 
         // Origin axes (slightly brighter)
-        DrawLine(new XnaVector2(0, minY), new XnaVector2(0, maxY), OriginAxisColor, lineW * 2);
-        DrawLine(new XnaVector2(minX, 0), new XnaVector2(maxX, 0), OriginAxisColor, lineW * 2);
+        DrawLine(new XnaVector2(0, minY), new XnaVector2(0, maxY), _originAxisColor, lineW * 2);
+        DrawLine(new XnaVector2(minX, 0), new XnaVector2(maxX, 0), _originAxisColor, lineW * 2);
     }
 
     // ── Bounding box ─────────────────────────────────────────────────────────
@@ -128,20 +137,20 @@ public sealed class GizmoRenderer : IDisposable
         XnaVector2 br = centre + new XnaVector2( halfW,  halfH);
         XnaVector2 bl = centre + new XnaVector2(-halfW,  halfH);
 
-        DrawLine(tl, tr, BoundsColor);
-        DrawLine(tr, br, BoundsColor);
-        DrawLine(br, bl, BoundsColor);
-        DrawLine(bl, tl, BoundsColor);
+        DrawLine(tl, tr, _boundsColor);
+        DrawLine(tr, br, _boundsColor);
+        DrawLine(br, bl, _boundsColor);
+        DrawLine(bl, tl, _boundsColor);
     }
 
     // ── Gizmo handles ────────────────────────────────────────────────────────
 
-    private void DrawGizmoHandles(GizmoMode mode, XnaVector2 origin)
+    private void DrawGizmoHandles(GizmoMode mode, XnaVector2 origin, float rotationDegrees)
     {
         switch (mode)
         {
             case GizmoMode.Move:   DrawMoveGizmo(origin);   break;
-            case GizmoMode.Rotate: DrawRotateGizmo(origin); break;
+            case GizmoMode.Rotate: DrawRotateGizmo(origin, rotationDegrees); break;
             case GizmoMode.Scale:  DrawScaleGizmo(origin);  break;
         }
     }
@@ -154,18 +163,18 @@ public sealed class GizmoRenderer : IDisposable
         XnaVector2 yEnd = origin + new XnaVector2(0, -GizmoController.ArrowLength);
 
         // X axis (right, red)
-        DrawLine(origin, xEnd, AxisXColor, LineThickness);
-        FillRect(new XnaRect((int)(xEnd.X - 2), (int)(xEnd.Y - ahHalf), ahInt, ahInt), AxisXColor);
+        DrawLine(origin, xEnd, _axisXColor, LineThickness);
+        FillRect(new XnaRect((int)(xEnd.X - 2), (int)(xEnd.Y - ahHalf), ahInt, ahInt), _axisXColor);
 
         // Y axis (up, green — screen-Y inverted)
-        DrawLine(origin, yEnd, AxisYColor, LineThickness);
-        FillRect(new XnaRect((int)(yEnd.X - ahHalf), (int)(yEnd.Y - 2), ahInt, ahInt), AxisYColor);
+        DrawLine(origin, yEnd, _axisYColor, LineThickness);
+        FillRect(new XnaRect((int)(yEnd.X - ahHalf), (int)(yEnd.Y - 2), ahInt, ahInt), _axisYColor);
 
         // XY-free square (yellow)
-        FillRect(new XnaRect((int)(origin.X + 12), (int)(origin.Y - 28), 16, 16), AxisXYColor);
+        FillRect(new XnaRect((int)(origin.X + 12), (int)(origin.Y - 28), 16, 16), _axisXYColor);
     }
 
-    private void DrawRotateGizmo(XnaVector2 origin)
+    private void DrawRotateGizmo(XnaVector2 origin, float rotationDegrees)
     {
         const int segments   = 48;
         float     angleStep  = MathHelper.TwoPi / segments;
@@ -176,8 +185,15 @@ public sealed class GizmoRenderer : IDisposable
             float a2 = (i + 1) * angleStep;
             XnaVector2 p1 = origin + new XnaVector2(MathF.Cos(a1), MathF.Sin(a1)) * GizmoController.RotateRadius;
             XnaVector2 p2 = origin + new XnaVector2(MathF.Cos(a2), MathF.Sin(a2)) * GizmoController.RotateRadius;
-            DrawLine(p1, p2, RotateColor, LineThickness);
+            DrawLine(p1, p2, _rotateColor, LineThickness);
         }
+
+        float rotationRad = MathHelper.ToRadians(rotationDegrees);
+        XnaVector2 dir = new(MathF.Cos(rotationRad), MathF.Sin(rotationRad));
+        XnaVector2 handlePos = origin + dir * GizmoController.RotateRadius;
+
+        DrawLine(origin, handlePos, _rotateColor, 1.5f);
+        FillRect(new XnaRect((int)(handlePos.X - 5), (int)(handlePos.Y - 5), 10, 10), _rotateColor);
     }
 
     private void DrawScaleGizmo(XnaVector2 origin)
@@ -188,11 +204,11 @@ public sealed class GizmoRenderer : IDisposable
         XnaVector2 xEnd = origin + new XnaVector2(GizmoController.ArrowLength, 0);
         XnaVector2 yEnd = origin + new XnaVector2(0, -GizmoController.ArrowLength);
 
-        DrawLine(origin, xEnd, AxisXColor, LineThickness);
-        DrawLine(origin, yEnd, AxisYColor, LineThickness);
+        DrawLine(origin, xEnd, _axisXColor, LineThickness);
+        DrawLine(origin, yEnd, _axisYColor, LineThickness);
 
-        FillRect(new XnaRect((int)(xEnd.X - h), (int)(xEnd.Y - h), hInt, hInt), AxisXColor);
-        FillRect(new XnaRect((int)(yEnd.X - h), (int)(yEnd.Y - h), hInt, hInt), AxisYColor);
+        FillRect(new XnaRect((int)(xEnd.X - h), (int)(xEnd.Y - h), hInt, hInt), _axisXColor);
+        FillRect(new XnaRect((int)(yEnd.X - h), (int)(yEnd.Y - h), hInt, hInt), _axisYColor);
         // Centre handle (uniform scale)
         FillRect(new XnaRect((int)(origin.X - h), (int)(origin.Y - h), hInt, hInt), XnaColor.White);
     }

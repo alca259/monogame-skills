@@ -15,6 +15,9 @@ public sealed class EditorContext
     private EditorGameObject? _selectedObject;
     private readonly List<EditorGameObject> _multiSelection = [];
     private EditorProject? _activeProject;
+    private readonly InternalEditorLogger _logger;
+    private bool _isSceneDirty;
+    private string? _playSnapshot;
 
     #region Singleton
 
@@ -42,6 +45,7 @@ public sealed class EditorContext
     {
         EventBus = eventBus;
         Commands = new CommandStack(100, eventBus);
+        _logger  = new InternalEditorLogger(eventBus);
     }
 
     #region Properties
@@ -51,6 +55,9 @@ public sealed class EditorContext
 
     /// <summary>Undo/redo history for all editor operations.</summary>
     public CommandStack Commands { get; }
+
+    /// <summary>The editor's centralized logger. Publishes <see cref="LogEntryAddedEvent"/> via <see cref="EventBus"/>.</summary>
+    public IEditorLogger Logger => _logger;
 
     /// <summary>Current editor state (Editing, Playing, or Paused).</summary>
     public EditorState State { get { lock (_stateLock) return _state; } }
@@ -69,6 +76,9 @@ public sealed class EditorContext
 
     /// <summary>Active game project, or <c>null</c> if no project is open.</summary>
     public EditorProject? ActiveProject { get { lock (_stateLock) return _activeProject; } }
+
+    /// <summary>Whether the active scene has unsaved changes.</summary>
+    public bool IsSceneDirty { get { lock (_stateLock) return _isSceneDirty; } }
 
     #endregion
 
@@ -119,13 +129,45 @@ public sealed class EditorContext
         EventBus.Publish(new GameObjectSelectedEvent(first));
     }
 
-    /// <summary>Sets the active scene and publishes <see cref="SceneLoadedEvent"/>.</summary>
+    /// <summary>Sets the active scene and publishes <see cref="SceneLoadedEvent"/>. Resets dirty state.</summary>
     public void SetActiveScene(EditorScene? scene)
     {
         lock (_stateLock)
+        {
             _activeScene = scene;
+            _isSceneDirty = false;
+        }
 
         EventBus.Publish(new SceneLoadedEvent(scene));
+        EventBus.Publish(new SceneDirtyChangedEvent(false));
+    }
+
+    /// <summary>Marks the active scene as having unsaved changes and publishes <see cref="SceneDirtyChangedEvent"/>.</summary>
+    public void MarkSceneDirty()
+    {
+        bool changed;
+        lock (_stateLock)
+        {
+            changed = !_isSceneDirty;
+            _isSceneDirty = true;
+        }
+
+        if (changed)
+            EventBus.Publish(new SceneDirtyChangedEvent(true));
+    }
+
+    /// <summary>Clears the dirty flag and publishes <see cref="SceneDirtyChangedEvent"/>.</summary>
+    public void MarkSceneClean()
+    {
+        bool changed;
+        lock (_stateLock)
+        {
+            changed = _isSceneDirty;
+            _isSceneDirty = false;
+        }
+
+        if (changed)
+            EventBus.Publish(new SceneDirtyChangedEvent(false));
     }
 
     /// <summary>Sets the active project and publishes <see cref="ProjectOpenedEvent"/>.</summary>
@@ -135,6 +177,45 @@ public sealed class EditorContext
             _activeProject = project;
 
         EventBus.Publish(new ProjectOpenedEvent(project));
+    }
+
+    /// <summary>Serializes the active scene to an in-memory JSON snapshot for Play mode restore.</summary>
+    public void TakePlaySnapshot()
+    {
+        lock (_stateLock)
+            _playSnapshot = _activeScene is null ? null : SceneSerializer.Serialize(_activeScene);
+    }
+
+    /// <summary>Deserializes and returns the stored play snapshot, or <c>null</c> if none exists.</summary>
+    public EditorScene? RestoreFromSnapshot()
+    {
+        lock (_stateLock)
+            return _playSnapshot is null ? null : SceneSerializer.Deserialize(_playSnapshot);
+    }
+
+    /// <summary>Clears the stored play snapshot.</summary>
+    public void ClearPlaySnapshot()
+    {
+        lock (_stateLock)
+            _playSnapshot = null;
+    }
+
+    #endregion
+
+    #region Internal logger
+
+    private sealed class InternalEditorLogger : IEditorLogger
+    {
+        private readonly IEditorEventBus _bus;
+
+        internal InternalEditorLogger(IEditorEventBus bus) => _bus = bus;
+
+        public void Log(string message, LogLevel level = LogLevel.Info)
+            => _bus.Publish(new LogEntryAddedEvent(new LogEntry(DateTime.Now, level, message)));
+
+        public void LogWarning(string message) => Log(message, LogLevel.Warning);
+        public void LogError(string message)   => Log(message, LogLevel.Error);
+        public void LogDebug(string message)   => Log(message, LogLevel.Debug);
     }
 
     #endregion

@@ -1,7 +1,7 @@
-# MonoGame Editor — Roadmap técnico (v2)
+# MonoGame Editor — Roadmap técnico (v3)
 
 **Stack**: .NET 10 · C# 14 · WinForms · MonoGame · MonoGame.Extended · MonoGame.Framework.WindowsDX · Alca.MonoGame.Kernel · System.Text.Json  
-**Objetivo**: Editor de juegos 2D estilo Unity, integrado con Visual Studio, con viewport MonoGame embebido, jerarquía ECS, gizmos de transform, editores especializados y pipeline de build.
+**Objetivo**: Editor de juegos 2D/3D estilo Unity/Valve Hammer Editor, integrado con Visual Studio, con viewport MonoGame embebido, jerarquía ECS, gizmos de transform, editores especializados y pipeline de build. Toda acción en el editor repercute en los ficheros `.cs` del proyecto de juego seleccionado siguiendo los patrones de `Alca.MonoGame.Kernel`.  
 **Reglas transversales a todos los desarrollos:**
 - Al terminar, actualizar este fichero marcando los TODOs completados.
 - Dentro de la carpeta src/murder-main-reference/Readme.md hay un editor de referencia basado en Monogame FNA que puede usarse como base.
@@ -29,8 +29,7 @@ Modo oscuro nativo de WinForms (.NET 10). No hay modo claro ni selector de tema.
 MonoGame.Editor.sln
 ├── Alca.MonoGame.Kernel          # Librería existente (referencia, nunca modificar)
 ├── MonoGame.Editor.Core          # Lógica del editor, sin UI — referencia Kernel + System.Text.Json
-├── MonoGame.Editor.WinForms      # Aplicación WinForms — referencia Editor.Core
-└── MonoGame.Editor.Templates     # Plantillas dotnet new para proyectos de juego nuevos
+└── MonoGame.Editor.WinForms      # Aplicación WinForms — referencia Editor.Core
 ```
 
 - El nuget de Alca.MonoGame.Kernel está una carpeta local "F:\Dev\NugetLocal\Alca.MonoGame.Kernel.1.0.0.nupkg" en principio está registrada como fuente de nugets bajo el nombre "DevLocal"
@@ -67,64 +66,7 @@ MonoGame.Editor.sln
 
 ## Fase 0 — Fundamentos y contratos base ✅ COMPLETADA
 
-### Objetivo
-Infraestructura transversal del editor: estado global, bus de eventos, preferencias persistidas.  
-Todo lo demás se construye sobre esta fase.
-
-### Proyecto: MonoGame.Editor.Core
-
-**`EditorContext`** — singleton, fuente de verdad del estado del editor
-```csharp
-sealed class EditorContext
-{
-    EditorState State { get; }
-    EditorScene? ActiveScene { get; }
-    EditorGameObject? SelectedObject { get; }
-    IReadOnlyList<EditorGameObject> MultiSelection { get; }
-    EditorProject? ActiveProject { get; }
-
-    void SetState(EditorState state);
-    void SetSelection(EditorGameObject? obj);
-    void SetMultiSelection(IEnumerable<EditorGameObject> objects);
-}
-```
-
-**`IEditorEventBus`** — comunicación desacoplada entre paneles
-```csharp
-interface IEditorEventBus
-{
-    void Publish<TEvent>(TEvent e) where TEvent : IEditorEvent;
-    void Subscribe<TEvent>(Action<TEvent> handler) where TEvent : IEditorEvent;
-    void Unsubscribe<TEvent>(Action<TEvent> handler) where TEvent : IEditorEvent;
-}
-```
-
-Eventos tipados:
-- `GameObjectSelectedEvent` — objeto seleccionado en jerarquía o viewport
-- `SceneLoadedEvent` — escena cargada o cambiada
-- `ProjectOpenedEvent` — proyecto abierto o cerrado
-- `AssetImportedEvent` — asset nuevo detectado por FileWatcher
-- `BehaviourAddedEvent` — behaviour adjuntado a un game object
-- `UndoPerformedEvent` / `RedoPerformedEvent` — actualiza menú Edit
-- `EditorStateChangedEvent` — Play/Pause/Stop
-
-**`EditorPreferences`** — persistencia del layout entre sesiones
-```csharp
-sealed class EditorPreferences
-{
-    int LeftPanelWidth { get; set; }
-    int RightPanelWidth { get; set; }
-    int ConsolePanelHeight { get; set; }
-    bool HierarchyVisible { get; set; }
-    bool InspectorVisible { get; set; }
-    bool AssetBrowserVisible { get; set; }
-    bool ConsoleVisible { get; set; }
-    string LastProjectPath { get; set; }
-
-    void Save();   // escribe a %APPDATA%/MonoGameEditor/preferences.json
-    void Load();
-}
-```
+Clases clave: `EditorContext`, `IEditorEventBus`, `EditorEventBus`, `EditorPreferences`, `EditorProject`, `EditorState`, eventos tipados (`GameObjectSelectedEvent`, `SceneLoadedEvent`, `ProjectOpenedEvent`, `AssetImportedEvent`, `BehaviourAddedEvent`, `UndoPerformedEvent`, `RedoPerformedEvent`, `EditorStateChangedEvent`).
 
 **`EditorProject`** — representa el proyecto de juego abierto
 ```csharp
@@ -140,693 +82,958 @@ sealed class EditorProject
 }
 ```
 
-**Fichero descriptor:** `{RootPath}/Editor/project.json`
-```json
-{
-  "name": "MyGame",
-  "version": "1.0",
-  "contentPath": "Content",
-  "localizationPath": "Localization"
-}
-```
-
-**Apertura de proyectos existentes:** si la carpeta seleccionada no tiene `Editor/project.json` pero contiene un `.sln`/`.slnx`, el editor ofrece inicializarlo: crea `Editor/` con su descriptor y crea las carpetas estándar faltantes sin tocar nada existente.
-
-Eventos tipados adicionales:
-- `ProjectOpenedEvent` — proyecto abierto o cerrado
-
-**Reusar del Kernel:** `EventBus` como implementación base de `IEditorEventBus`.
-
 ---
 
 ## Fase 1 — WinForms shell con viewport MonoGame embebido ✅ COMPLETADA
 
-### Objetivo
-Ventana del editor funcional con viewport MonoGame, controles Play/Pause/Stop y layout de paneles.
-
-### Proyecto: MonoGame.Editor.WinForms
-
-**Framework y dependencias**
-- `<TargetFramework>net10.0-windows</TargetFramework>`
-- `<UseWindowsForms>true</UseWindowsForms>`
-- NuGet: `MonoGame.Framework.WindowsDX`
-- Referencia a `MonoGame.Editor.Core`
-
-**Layout de `EditorForm`**
-- `MenuStrip`: File · Edit · View · Project · Debug
-- `ToolStrip`: Play/Pause/Stop + indicador de estado + modos de gizmo (Select/Move/Rotate/Scale)
-- `SplitContainer` horizontal: panel izquierdo (`TabControl`: jerarquía + asset browser) + resto
-- `SplitContainer` vertical en el resto: viewport (centro) + inspector (derecha)
-- `Panel` inferior colapsable: consola
-
-Tamaños mínimos aplicados con `SplitContainer.Panel1MinSize` / `Panel2MinSize`:
-- Panel izquierdo: 180 px
-- Viewport: 320 × 240 px
-- Inspector: 220 px
-- Consola: 80 px
-
-Visibilidad de paneles via menú View con checkboxes; último tamaño persistido en `EditorPreferences`.
-
-Debe haber una barra de menús superior y una barra de estado inferior docked para informar al usuario de tareas en segundo plano.
-
-**`MonoGameControl`** — viewport embebido
-```csharp
-sealed class MonoGameControl : Control
-{
-    // SwapChainRenderTarget inicializado con Handle del control
-    // Game loop en hilo separado; actualizaciones de UI via Control.Invoke
-    // Al redimensionar, recrear SwapChainRenderTarget
-}
-```
-
-**Cámara del editor** — reusar `Camera2D` del Kernel
-- Pan: botón central del ratón o Alt + arrastrar
-- Zoom: rueda del ratón
-- En modo Playing: usar la cámara de la escena en lugar de la del editor
-
-**Shortcuts del editor** — reusar `InputActionMap` + `InputSerializer` del Kernel
-- Acciones predefinidas: `editor.play`, `editor.pause`, `editor.stop`, `editor.undo`, `editor.redo`, `editor.save`, `gizmo.select`, `gizmo.move`, `gizmo.rotate`, `gizmo.scale`, `grid.toggle`
-- Serializado en `%APPDATA%/MonoGameEditor/shortcuts.json` con `InputSerializer`
-- Editable desde menú Edit → Keyboard Shortcuts
-
-**Conversión de coordenadas** — reusar `ResolutionManager` del Kernel
-- `ResolutionManager.ScreenToVirtual(screenPos)` para convertir click en viewport a coordenadas mundo
-- Necesario para ray picking 2D y colocación de gizmos
-
-**Snapshot de escena en Play/Stop**
-- Play: serializar `GameWorld` completo a JSON con `SceneSerializer` → guardar en memoria
-- Stop: deserializar el snapshot y reconstruir `GameWorld` → volver a estado `Editing`
+Clases clave: `EditorForm` (MenuStrip + ToolStrip + StatusStrip + SplitContainers), `MonoGameControl` (SwapChainRenderTarget, hilo separado), `EditorCamera2D` (Pan/Zoom con ratón), reutilización de `Camera2D` del Kernel.
 
 ---
 
 ## Fase 2 — Sistema Undo/Redo ✅ COMPLETADA
 
-### Objetivo
-Historial de operaciones reversibles. Esencial para cualquier flujo de edición profesional.
-
-### Proyecto: MonoGame.Editor.Core
-
-**`IEditorCommand`** — interfaz base
-```csharp
-interface IEditorCommand
-{
-    string Description { get; }  // mostrado en menú Edit → Undo "Move Entity"
-    void Execute();
-    void Undo();
-}
-```
-
-**`CommandStack`** — historial
-```csharp
-sealed class CommandStack
-{
-    int MaxHistory { get; } = 100;
-    string? UndoDescription { get; }  // null si pila vacía
-    string? RedoDescription { get; }
-
-    void Execute(IEditorCommand command);  // ejecuta y apila en undo; limpia redo
-    void Undo();
-    void Redo();
-    void Clear();
-}
-```
-
-**Comandos concretos** en `MonoGame.Editor.Core/Commands/`:
-
-| Clase | Operación |
-|-------|-----------|
-| `CreateEntityCommand` | Crear game object |
-| `DeleteEntityCommand` | Eliminar game object (y hijos) |
-| `RenameEntityCommand` | Renombrar |
-| `ReparentEntityCommand` | Cambiar padre en jerarquía |
-| `MoveEntityCommand` | Cambiar posición (TransformBehaviour) |
-| `RotateEntityCommand` | Cambiar rotación |
-| `ScaleEntityCommand` | Cambiar escala |
-| `SetPropertyCommand` | Cambiar propiedad genérica via reflexión |
-| `AddBehaviourCommand` | Adjuntar GameBehaviour |
-| `RemoveBehaviourCommand` | Eliminar GameBehaviour |
-| `PaintTileCommand` | Pintar tile en tilemap |
-| `EraseTileCommand` | Borrar tile en tilemap |
-| `ApplyPrefabCommand` | Aplicar cambios prefab a instancias |
-| `RevertPrefabCommand` | Revertir instancia a definición del prefab |
-
-**Integración con shortcuts:**
-- Ctrl+Z → `CommandStack.Undo()` via `InputActionMap`
-- Ctrl+Y / Ctrl+Shift+Z → `CommandStack.Redo()`
-- El menú Edit → Undo/Redo actualiza su texto con `UndoDescription` / `RedoDescription`
+Clases clave: `IEditorCommand`, `CommandStack`, 18 comandos concretos (Create/Delete/Rename/Reparent/Move/Rotate/Scale/SetProperty/AddBehaviour/RemoveBehaviour/PaintTile/EraseTile/ApplyPrefab/RevertPrefab). Shortcuts Ctrl+Z / Ctrl+Y activos.
 
 ---
 
 ## Fase 3 — Jerarquía de escena e Inspector ✅ COMPLETADA
 
+Clases clave: `SceneHierarchyPanel` (TreeView + drag-drop + menú contextual), `InspectorPanel` (Transform section + secciones por behaviour via reflexión + `EditorPropertyAttribute`), `AddBehaviourDialog`, `SceneSerializer`, `GameObjectRegistry`.
+
+Modelos de datos: `EditorScene`, `EditorGameObject`, `EditorBehaviour`, `EditorVector2`. Clases del Kernel reutilizadas: `GameWorld`, `GameEntity`, `GameBehaviour`, `TransformBehaviour`, `GameEntityPool`.
+
+---
+
+## Fase 4 — Gizmos de transform y grid/snap ✅ COMPLETADA
+
+Clases clave: `GizmoController`, `GizmoRenderer`, `GizmoDragAxis`, `GizmoMode` (Select/Move/Rotate/Scale). Shortcuts Q/W/E/R. Grid overlay toggle G con snap a Ctrl. Clases del Kernel reutilizadas: `Camera2D`, `DrawHelper`, `PrimitiveBatch`, `GeometryUtility`, `ResolutionManager`.
+
+---
+
+## Fase 5 — Asset Browser e integración Content Pipeline ✅ COMPLETADA
+
+Clases clave: `AssetBrowserPanel` (SplitContainer folder tree + ListView + preview), `AssetClassifier`, `AssetInfo`, `AssetType`, `ContentWatcher` (FileSystemWatcher), `MgcbRunner`. Clases del Kernel reutilizadas: `AsyncContentLoader`, `ContentLoadGroup`, `Sprite`.
+
+---
+
+## Fase 6 — Editor de Tilemaps ✅ COMPLETADA
+
+Clases clave: `TilemapPalettePanel`, `EditorTilemapAsset`, `EditorTileLayer`, `EditorTileset`, `TilemapImporter`, `PaintTileCommand`, `EraseTileCommand`, `TilemapLayerSelectedEvent`. Clases del Kernel reutilizadas: `TiledMapRenderer`, `TiledObjectLayer`.
+
+---
+
+## Fase 7 — Sistema de Prefabs ✅ COMPLETADA
+
+Clases clave: `PrefabManager`, `PrefabSerializer`, `ApplyPrefabCommand`, `RevertPrefabCommand`. Prefabs en jerarquía marcados con icono azul. Inspector muestra botones Apply/Revert.
+
+---
+
+## Fase 0.5 — Proyecto con referencias al juego ✅ COMPLETADA
+
 ### Objetivo
-Árbol de game objects enlazado directamente al `GameWorld` del Kernel. Inspector de propiedades por reflexión sobre `GameBehaviour`.
 
-### Clases del Kernel reutilizadas
-- `GameWorld` — fuente de verdad de todas las entidades
-- `GameEntity` — nodo del árbol (nombre, GUID, activo, hijos, padre)
-- `GameBehaviour` — componentes inspeccionables
-- `TransformBehaviour` — sección de transform siempre visible en inspector
-- `GameEntityPool` — pool para creación eficiente de entidades
+Conectar el editor al proyecto de juego real. Sin `GameCsprojPath`, el editor no puede saber dónde está el código fuente del juego para ninguna fase de CodeGen futura. Esta es la base de toda la integración de código.
 
-### Panel: `SceneHierarchyPanel`
+### Proyecto: MonoGame.Editor.Core
 
-**TreeView** mapeado sobre `GameWorld`:
-- Cada nodo = `GameEntity`; los hijos aparecen anidados
-- Checkbox de activación (activo/inactivo) por nodo
-- Icono según behaviours adjuntos (sprite, camera, audio, etc.)
-- Estado de expansión persistido en la sesión
+**`Project/EditorProject.cs`** — nuevas propiedades:
 
-**Operaciones (menú contextual + atajos):**
+```csharp
+/// <summary>Absolute path to the main game .csproj file. Empty string if not configured.</summary>
+public string GameCsprojPath { get; }
 
-| Operación | Atajo | Comando generado |
-|-----------|-------|-----------------|
-| Create Empty | — | `CreateEntityCommand` |
-| Create Child | — | `CreateEntityCommand` (padre = seleccionado) |
-| Duplicate | Ctrl+D | `CreateEntityCommand` (copia profunda) |
-| Rename | F2 | `RenameEntityCommand` |
-| Delete | Supr | `DeleteEntityCommand` |
-| Set Active/Inactive | — | `SetPropertyCommand` |
+/// <summary>Absolute path to the game source folder (directory containing GameCsprojPath).
+/// Empty string if GameCsprojPath is not set.</summary>
+public string GameSourcePath { get; }
+```
 
-**Drag & drop:**
-- Arrastrar nodo sobre otro → `ReparentEntityCommand`
-- Arrastrar fuera de padre → mover a raíz
-- Indicadores visuales: resaltado del destino + línea de inserción entre nodos
+Constructor actualizado:
+```csharp
+public EditorProject(
+    string name,
+    string rootPath,
+    string gameCsprojPath = "",
+    string contentRelativePath = "Content",
+    string localizationRelativePath = "Localization")
+```
 
-**Selección:**
-- Click simple → selecciona + publica `GameObjectSelectedEvent`
-- Ctrl+Click / Shift+Click → selección múltiple
-- Click en viewport → ray picking 2D con `Camera2D` + `ResolutionManager`
-- Game object seleccionado resaltado en árbol y con bounding box en viewport
+Lógica interna: `GameSourcePath = string.IsNullOrWhiteSpace(gameCsprojPath) ? string.Empty : Path.GetDirectoryName(gameCsprojPath) ?? string.Empty`. Las rutas `ContentPath` y `LocalizationPath` se resuelven relativas a `GameSourcePath` si no está vacío, de lo contrario relativas a `RootPath`.
 
-### Panel: `InspectorPanel`
+**`Project/ProjectManager.cs`** — cambios:
 
-**Sección de transform** (siempre visible, enlazada a `TransformBehaviour`):
-- Position (X, Y), Rotation, Scale (X, Y)
-- Cambios inmediatos en viewport via `MoveEntityCommand` / `RotateEntityCommand` / `ScaleEntityCommand`
+Clase interna `ProjectFileData` extendida:
+```csharp
+[JsonPropertyName("gameCsprojPath")]
+public string GameCsprojPath { get; set; } = string.Empty;
+```
 
-**Sección por behaviour** (colapsable, una sección por `GameBehaviour` adjunto):
-- Cabecera: nombre del tipo + checkbox de habilitado + botón eliminar (×)
-- Propiedades marcadas con `[EditorProperty]` generadas dinámicamente por reflexión
-- Controles de edición por tipo:
+Formato `project.json` resultante:
+```json
+{
+  "name": "MyGame",
+  "version": "1.0",
+  "gameCsprojPath": "src/MyGame/MyGame.csproj",
+  "contentPath": "src/MyGame/Content",
+  "localizationPath": "src/MyGame/Localization"
+}
+```
+
+Métodos actualizados:
+- `Create(string name, string parentPath, string gameCsprojPath = "", string contentRelativePath = "Content", string localizationRelativePath = "Localization")` — acepta la ruta al .csproj opcional
+- `Load(string projectPath)` — lee `gameCsprojPath` del JSON, lo pasa al constructor
+- `Initialize(string projectPath)` — nueva sobrecarga que acepta `gameCsprojPath` opcional; puede auto-detectarlo
+- `WriteProjectFile(EditorProject project)` — escribe `gameCsprojPath` relativo a `RootPath`
+
+Nuevo método:
+```csharp
+/// <summary>
+/// Scans rootPath up to 3 levels deep for the first .csproj containing a MonoGame
+/// PackageReference. Returns null if none found.
+/// </summary>
+public static string? FindGameCsproj(string rootPath)
+```
+
+**`Events/GameCsprojChangedEvent.cs`** (nuevo):
+```csharp
+public sealed record GameCsprojChangedEvent(EditorProject Project) : IEditorEvent;
+```
+
+### Proyecto: MonoGame.Editor.WinForms
+
+**`Dialogs/NewProjectDialog.Designer.cs`** — ampliar de 3 a 6 filas, `ClientSize` de 480×130 a 480×240:
+
+Controles nuevos (siguiendo la restricción WinForms Designer — **nunca usar `[...]` collection expressions**):
+
+```csharp
+// Row 3: Game .csproj
+private System.Windows.Forms.Label _csprojLabel;
+private System.Windows.Forms.TableLayoutPanel _csprojRow;
+private System.Windows.Forms.TextBox _csprojTextBox;        // ReadOnly = true
+private System.Windows.Forms.Button _browseCsprojButton;
+
+// Row 4: Content folder
+private System.Windows.Forms.Label _contentLabel;
+private System.Windows.Forms.TableLayoutPanel _contentRow;
+private System.Windows.Forms.TextBox _contentTextBox;       // ReadOnly = true
+private System.Windows.Forms.Button _browseContentButton;
+
+// Row 5: Localization folder
+private System.Windows.Forms.Label _localizationLabel;
+private System.Windows.Forms.TableLayoutPanel _localizationRow;
+private System.Windows.Forms.TextBox _localizationTextBox;  // ReadOnly = true
+private System.Windows.Forms.Button _browseLocalizationButton;
+```
+
+`_gridPanel` ampliado a 6 filas de `SizeType.Absolute, 28F`. Altura total: 168px. Altura del Form: 240px.
+
+Un separador visual (`Label` de 1px altura, `BackColor = SystemColors.ControlDark`, ColumnSpan=2) entre fila 2 (Full path) y fila 3 (Game .csproj).
+
+Etiquetas: "Game .csproj:" / "Content folder:" / "Localization folder:" — `ContentAlignment.MiddleLeft`, misma anchura de columna 0 (110px).
+
+**`Dialogs/NewProjectDialog.cs`** — nuevas propiedades y handlers:
+
+```csharp
+/// <summary>Absolute path to the game .csproj file. Empty string if not chosen.</summary>
+public string GameCsprojPath => _csprojTextBox.Text.Trim();
+
+/// <summary>Absolute path to the game Content folder. Empty string if not set.</summary>
+public string ContentPath => _contentTextBox.Text.Trim();
+
+/// <summary>Absolute path to the game Localization folder. Empty string if not set.</summary>
+public string LocalizationPath => _localizationTextBox.Text.Trim();
+```
+
+Handler `OnBrowseCsprojClick`:
+```csharp
+private void OnBrowseCsprojClick(object? sender, EventArgs e)
+{
+    using OpenFileDialog dlg = new()
+    {
+        Title  = "Select the main game .csproj",
+        Filter = "MonoGame Project (*.csproj)|*.csproj",
+        InitialDirectory = Directory.Exists(ParentPath) ? ParentPath
+            : Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+    };
+
+    if (dlg.ShowDialog(this) != DialogResult.OK) return;
+
+    _csprojTextBox.Text = dlg.FileName;
+    AutoFillGamePaths(Path.GetDirectoryName(dlg.FileName)!);
+}
+```
+
+Método `AutoFillGamePaths(string csprojDir)`:
+- `_contentTextBox.Text = Path.Combine(csprojDir, "Content")`
+- `_localizationTextBox.Text = Path.Combine(csprojDir, "Localization")`
+- Ambos se rellenan como sugerencia aunque la carpeta no exista aún
+
+Handlers `OnBrowseContentClick` / `OnBrowseLocalizationClick`: abren `FolderBrowserDialog`.
+
+`UpdatePreviewAndOk()` actualizado:
+- OK se habilita con `ProjectName` válido y `ParentPath` existente
+- `GameCsprojPath` es **opcional** — si vacío, OK sigue habilitado
+- Si `GameCsprojPath` relleno pero el archivo no existe: `_previewValueLabel.ForeColor = Color.OrangeRed` + texto de advertencia
+
+**`EditorForm.cs`** — handler `OnFileNewProjectClick` actualizado:
+
+```csharp
+private async void OnFileNewProjectClick(object? sender, EventArgs e)
+{
+    using NewProjectDialog dlg = new();
+    if (dlg.ShowDialog(this) != DialogResult.OK) return;
+
+    try
+    {
+        EditorProject project = await Task.Run(() =>
+            ProjectManager.Create(
+                dlg.ProjectName,
+                dlg.ParentPath,
+                dlg.GameCsprojPath,
+                string.IsNullOrWhiteSpace(dlg.ContentPath)
+                    ? "Content"
+                    : Path.GetRelativePath(Path.Combine(dlg.ParentPath, dlg.ProjectName), dlg.ContentPath),
+                string.IsNullOrWhiteSpace(dlg.LocalizationPath)
+                    ? "Localization"
+                    : Path.GetRelativePath(Path.Combine(dlg.ParentPath, dlg.ProjectName), dlg.LocalizationPath)))
+            .ConfigureAwait(true);
+
+        _context.SetActiveProject(project);
+        _context.EventBus.Publish(new ProjectOpenedEvent(project));
+    }
+    catch (Exception ex)
+    {
+        MessageBox.Show(this, ex.Message, "Error creating project", MessageBoxButtons.OK, MessageBoxIcon.Error);
+    }
+}
+```
+
+---
+
+## Fase 8 — Calidad UI: Paneles Existentes Mejorados ✅ COMPLETADA
+
+### Objetivo
+
+Llevar cada panel del estado "mínimo funcional" a un nivel comparable con herramientas profesionales. Los paneles actuales tienen UX deficiente: la consola no filtra, el inspector no tiene cabecera de entidad, el browser no tiene búsqueda ni menú contextual.
+
+### 8a — ConsolePanel mejorado
+
+**Proyecto: MonoGame.Editor.Core**
+
+`Core/Logging/LogLevel.cs`:
+```csharp
+public enum LogLevel { Debug, Info, Warning, Error }
+```
+
+`Core/Logging/LogEntry.cs`:
+```csharp
+public readonly record struct LogEntry(DateTime Timestamp, LogLevel Level, string Message);
+```
+
+`Core/Logging/IEditorLogger.cs`:
+```csharp
+public interface IEditorLogger
+{
+    void Log(string message, LogLevel level = LogLevel.Info);
+    void LogWarning(string message);
+    void LogError(string message);
+    void LogDebug(string message);
+    void Clear();
+}
+```
+
+`Events/LogEntryAddedEvent.cs`:
+```csharp
+public sealed record LogEntryAddedEvent(LogEntry Entry) : IEditorEvent;
+```
+
+`EditorContext` expone `IEditorLogger Logger { get; }` — implementación interna publica entradas via `IEditorEventBus`.
+
+**Proyecto: MonoGame.Editor.WinForms**
+
+`Panels/ConsolePanel.cs` — diseño WinForms:
+
+| Control | Configuración |
+|---------|---------------|
+| `ToolStrip` (Dock=Top, Height=28) | Barra superior del panel |
+| `ToolStripButton` "Clear" | Limpia la salida |
+| `ToolStripButton` "Copy" | Copia selección al clipboard |
+| `ToolStripSeparator` | División visual |
+| `ToolStripDropDownButton` "Filter ▼" | Items: All / Debug / Info / Warning / Error |
+| `RichTextBox` (Dock=Fill, ReadOnly=true) | `BackColor=#1E1E1E`, `Font=Consolas 9pt` |
+
+Color-coding por `LogLevel`:
+- `Debug` → `Color.DimGray`
+- `Info` → `SystemColors.ControlText`
+- `Warning` → `Color.Goldenrod`
+- `Error` → `Color.IndianRed` + Bold
+
+Formato de línea: `[HH:mm:ss] [LEVEL] message`
+
+API pública:
+```csharp
+public void AppendLine(string message, LogLevel level = LogLevel.Info);
+public void AppendBuildLine(string line);  // detecta patrones MSBuild para colorear
+public void Clear();
+```
+
+`AppendBuildLine` detecta:
+- `"error CS"` → `LogLevel.Error`
+- `"warning CS"` → `LogLevel.Warning`
+- `"Build succeeded"` → `LogLevel.Info` + `Color.LightGreen`
+- `"Build FAILED"` → `LogLevel.Error`
+
+---
+
+### 8b — SceneHierarchyPanel mejorado
+
+`ToolStrip` (Dock=Top, Height=25):
+
+| Control | Configuración |
+|---------|---------------|
+| `ToolStripButton` "+" | Crea entidad raíz (`CreateEntityCommand`) |
+| `ToolStripButton` "trash" | Elimina entidad seleccionada (con confirmación si tiene hijos) |
+| `ToolStripSeparator` | — |
+| `ToolStripTextBox` Search | Width=110, PlaceholderText="Search...", TextChanged filtra árbol |
+| `ToolStripLabel` contador | Alineado derecha: "{n} entities" |
+
+`TreeView` con `ImageList` (16×16):
+- Índice 0: cubo gris (GameEntity genérico)
+- Índice 1: cámara
+- Índice 2: luz
+- Índice 3: partículas
+- Índice 4: tilemap
+
+Filtrado incremental: `RebuildTree()` aplica `MatchesFilter(EditorGameObject, string filter)` que retorna `true` si el nombre contiene el filtro (OrdinalIgnoreCase) o cualquier descendiente lo hace. Nodos sin match se omiten.
+
+`Label` de estado (Dock=Bottom, Height=18, Font=7.5pt, ForeColor=GrayText): "{n} objects in scene".
+
+---
+
+### 8c — InspectorPanel mejorado
+
+**Proyecto: MonoGame.Editor.Core**
+
+`EditorGameObject` añade:
+```csharp
+/// <summary>User-defined tags. Serialized with the scene.</summary>
+public List<string> Tags { get; } = [];
+```
+
+Nuevo `SetTagsCommand` en `Commands/`.
+
+**Proyecto: MonoGame.Editor.WinForms**
+
+**Cabecera de entidad** (`Panel` Dock=Top, Height=56, BackColor=ControlDarkDark):
+
+| Control | Configuración |
+|---------|---------------|
+| `CheckBox` Active | Dock=Left, Width=18, sin texto; vinculado a `EditorGameObject.Active` via `SetPropertyCommand` |
+| `TextBox` EntityName | Dock=Fill, Font=Segoe UI 10pt Bold, BackColor=ControlDarkDark; Leave → `RenameEntityCommand` |
+| `ComboBox` Tags | Dock=Right, Width=90, DropDownStyle=DropDown; Enter confirma añadir tag |
+| `Label` Id | Dock=Bottom, Height=16, Font=7pt, ForeColor=GrayText; primeros 8 chars del GUID |
+
+**Controles por tipo** en `CreateControlForProperty`:
 
 | Tipo C# | Control WinForms |
 |---------|-----------------|
 | `float`, `int` | `NumericUpDown` |
 | `bool` | `CheckBox` |
 | `string` | `TextBox` |
-| `Vector2` | Dos `NumericUpDown` (X, Y) en línea |
-| `Color` | Botón que abre `ColorDialog` |
-| `enum` | `ComboBox` |
-| Referencia a asset | `TextBox` readonly + botón Browse + acepta drop desde Asset Browser |
+| `Vector2` | Dos `NumericUpDown` X/Y en línea |
+| `Vector3` | Tres `NumericUpDown` X/Y/Z en línea |
+| `Color` | `Panel` (24px, `BackColor=color actual`) + `Button` "..." → `ColorDialog` |
+| `enum` (no flags) | `ComboBox` |
+| `enum` con `[Flags]` | `CheckedListBox` `CheckOnClick=true` |
+| Asset reference (`string` con atributo asset) | `TextBox` ReadOnly + `Button` "..." → `OpenFileDialog` filtrado |
 
-- Todos los cambios van a `CommandStack` via `SetPropertyCommand`
+**Secciones colapsables**: cada cabecera de sección (`Panel` 28px) gana un `Label` chevron "▼"/"▶" a la izquierda. Click alterna visibilidad del body. Estado de colapso persistido en `EditorPreferences` en `Dictionary<string, bool> BehaviourSectionCollapsed`.
 
-**Botón Add Behaviour:**
-- Popup con búsqueda incremental sobre `GameObjectRegistry`
-- Opción `Create new...` → lanza CodeGen (Fase 14)
-- Selección → `AddBehaviourCommand`
-
-### Modelos de datos en `MonoGame.Editor.Core`
-
-```
-EditorScene
-├── string Name
-├── string ScenePath
-├── List<EditorGameObject> RootGameObjects
-├── EditorCameraConfig Camera
-└── EditorAmbientConfig Lighting
-
-EditorGameObject
-├── Guid Id
-├── string Name
-├── bool Active
-├── Vector2 Position
-├── float Rotation
-├── Vector2 Scale
-├── List<EditorBehaviour> Behaviours
-└── List<EditorGameObject> Children
-
-EditorBehaviour
-├── string TypeName
-├── Dictionary<string, JsonElement> Properties
-└── bool Enabled
-```
-
-**`SceneSerializer`** — `System.Text.Json`
-- Tipos soportados: `int`, `float`, `bool`, `string`, `Vector2`, `Vector3`, `Color`, `enum`, rutas relativas a assets
-- Instanciación: `Activator.CreateInstance(Type.GetType(typeName))`
-
-**`GameObjectRegistry`**
-- Al arrancar, escanea ensamblados cargados por reflexión buscando subclases de `GameBehaviour`
-- `IReadOnlyDictionary<string, Type> RegisteredTypes`
-- Actualizado automáticamente tras CodeGen al recargar el ensamblado
+**Botón "Add Behaviour"** estilizado: `FlatStyle.Flat`, padding `(4,2)`, texto "+ Add Behaviour", centrado en `Panel` con `Padding(4)`.
 
 ---
 
-## Fase 4 — Gizmos de transform y grid/snap ✅ COMPLETADA
+### 8d — AssetBrowserPanel mejorado
 
-### Objetivo
-Herramientas visuales de transformación en el viewport: move, rotate, scale. Grid configurable con snap.
+**Barra superior** (`TableLayoutPanel` 1 fila 3 columnas, Dock=Top, Height=28):
 
-### Clases del Kernel reutilizadas
-- `DrawHelper` — primitivas 2D en el viewport
-- `PrimitiveBatch` — líneas y formas para gizmos
-- `Camera2D` — conversión entre espacio mundo y espacio pantalla
-- `GeometryUtility` — cálculo de bounding box para selección
-- `ResolutionManager` — conversión coordenadas pantalla → mundo
+| Col | Control | Configuración |
+|-----|---------|---------------|
+| 0 (AutoSize) | `ToolStrip` | Botones: Import / Refresh / New Folder |
+| 1 (Fill) | `TextBox` filtro | PlaceholderText="Filter assets...", TextChanged con debounce 150ms |
+| 2 (AutoSize) | `ToolStripButton` | Toggle List/LargeIcon |
 
-### `GizmoRenderer` en `MonoGame.Editor.Core`
+**Breadcrumb** (`FlowLayoutPanel`, Dock=Top, Height=22): cada segmento de ruta = `LinkLabel` clickable; separadores "›" entre ellos. Se reconstruye al navegar.
 
-Modo activo seleccionable en toolbar (y por atajo de teclado):
+**Menú contextual del `ListView`** (`ContextMenuStrip`):
+- "Open with External Editor" — `Process.Start(new ProcessStartInfo { FileName = path, UseShellExecute = true })`
+- "Reveal in Explorer" — `Process.Start("explorer.exe", $"/select,\"{path}\"")`
+- Separator
+- "Rename" — inicia `LabelEdit`
+- "Delete" — confirmación via `MessageBox` + publicar `AssetImportedEvent`
+- Separator
+- "Copy Relative Path" — clipboard
 
-| Modo | Atajo | Descripción |
-|------|-------|-------------|
-| Select | Q | Solo selección; sin gizmo visible |
-| Move | W | Flechas X/Y arrastrables |
-| Rotate | E | Arco circular arrastrable |
-| Scale | R | Cuadrados en extremos arrastrables |
+**Modo LargeIcon**: `_contentView.View = View.LargeIcon`, `LargeImageList` 64×64. Texturas: `Image.FromFile` + `GetThumbnailImage(64, 64, null, IntPtr.Zero)`.
 
-**Move gizmo:**
-- Flecha roja = eje X, flecha verde = eje Y, cuadrado amarillo = XY libre
-- Al soltar genera `MoveEntityCommand` con posición inicial y final
-- Coordenadas calculadas con `Camera2D.ScreenToWorld()` aplicando `ResolutionManager`
-
-**Rotate gizmo:**
-- Arco circular blanco alrededor del pivot del game object
-- Al soltar genera `RotateEntityCommand`
-
-**Scale gizmo:**
-- Cuadrados en los extremos del bounding box
-- Al soltar genera `ScaleEntityCommand`
-
-**Bounding box de selección:**
-- Rectángulo de puntos punteados alrededor del game object seleccionado
-- Calculado con `GeometryUtility.CalculateBoundingBox()`
-- Solo visible en modo `Editing`
-
-**Grid:**
-- Overlay de líneas equidistantes sobre el viewport (renderizado con `PrimitiveBatch`)
-- Tamaño de celda configurable en Project Settings (Fase 12)
-- Color del grid: gris claro semi-transparente
-- Toggle con la tecla G
-
-**Snap:**
-- Al mantener Ctrl, la posición se redondea al grid al soltar el gizmo
-- Tamaño del snap = tamaño de celda del grid
-- Configurable en Project Settings
+Debounce de búsqueda: `System.Windows.Forms.Timer` de 150ms reiniciado en cada `TextChanged`; al dispararse llama a `ShowFolderContents(currentFolder)` con filtro activo.
 
 ---
 
-## Fase 5 — Asset Browser e integración Content Pipeline ✅ COMPLETADA
+## Fase 9 — Gestión de Escenas Mejorada ✅ COMPLETADA
 
 ### Objetivo
-Browser de assets con drag & drop al viewport y al Inspector. Importación y recompilación automática.
 
-### Clases del Kernel reutilizadas
-- `AsyncContentLoader` — carga de assets en background sin bloquear la UI
-- `ContentLoadGroup` — recarga de grupos de assets relacionados
-- `Sprite` — asignación de textura al arrastrar al viewport
-
-### Panel: `AssetBrowserPanel`
-
-**TreeView** que replica la estructura de carpetas de `Content/`:
-- Iconos por tipo: textura, audio, fuente, tilemap, escena, prefab, partículas, animación, input
-- Panel de preview al seleccionar: miniatura de textura con `SpriteBatch` en mini-viewport, info de dimensiones y formato
-
-**Drag & drop al Inspector:**
-- Arrastrar un asset sobre un campo de referencia en el Inspector lo asigna directamente
-- El campo acepta el asset si el tipo es compatible
-
-**Drag & drop al viewport:**
-- Textura → crea `GameEntity` con `Sprite` (del Kernel) en la posición del drop
-- `.tmx` → crea `GameEntity` con `TiledMapRenderer` adjunto
-- `.prefab.json` → instancia el prefab (ver Fase 7)
-
-**Drag & drop desde explorador de Windows:**
-- Archivos externos arrastrados a la ventana del editor se copian a `Content/` correspondiente
-- Se importan automáticamente
-
-**FileWatcher:**
-- `FileSystemWatcher` sobre `Content/`
-- Al detectar cambios, usa `ContentLoadGroup` del Kernel para recargar el grupo afectado
-- Actualiza Asset Browser y viewport automáticamente
-- Publica `AssetImportedEvent` via `IEditorEventBus`
-
-**MGCB:**
-- El editor invoca `dotnet mgcb Content/Content.mgcb` antes de entrar en modo Play si hay assets sin compilar
-- Output en `ConsolePanel`
-- `AsyncContentLoader` del Kernel para cargar assets compilados en background
-
----
-
-## Fase 6 — Editor de Tilemaps ✅ COMPLETADA
-
-### Objetivo
-Edición visual de tilemaps `.tmx` con palette de tiles, selección de capa y pintura directa en viewport.
-
-### Clases del Kernel reutilizadas
-- `TiledMapRenderer` — render del tilemap en el viewport
-- `TiledObjectLayer` — acceso y modificación de capas de objetos
-
-### Importación
-
-- `MonoGame.Extended.Tiled` provee el parser de `.tmx`
-- Al importar un `.tmx` → crear `EditorTilemapAsset` con rutas de tilesets, capas y propiedades por tile
-- Renderizar con `TiledMapRenderer` del Kernel en el viewport
-- Capas del tilemap como `GameEntity` hijos en la jerarquía de escena
-
-### Edición en viewport
-
-Al seleccionar un game object con tilemap, el viewport entra en modo tilemap:
-
-- **Palette panel** (panel flotante o tab en el inspector): tiles del tileset activo, organizados por categoría
-- **Dropdown** para seleccionar capa activa
-- Click izquierdo: pinta tile seleccionado → `PaintTileCommand`
-- Click derecho: borra tile → `EraseTileCommand`
-- Ctrl+Z / Ctrl+Y: deshacer/rehacer via `CommandStack`
-- Los cambios se guardan en el `.tmx` directamente vía `TiledObjectLayer` del Kernel
-
----
-
-## Fase 7 — Sistema de Prefabs ✅ COMPLETADA
-
-### Objetivo
-Guardar y reutilizar configuraciones de game objects como plantillas reutilizables, al estilo Unity.
+El editor gestiona el ciclo de vida completo de escenas: nueva, abrir, guardar, renombrar, eliminar, con feedback visual de escena modificada y panel de gestión dedicado.
 
 ### Proyecto: MonoGame.Editor.Core
 
-Un prefab es un `EditorGameObject` serializado a `.prefab.json` en `Content/Prefabs/`.
+`EditorContext` ampliado:
 
-**`PrefabManager`:**
 ```csharp
-sealed class PrefabManager
-{
-    void Save(EditorGameObject source, string prefabPath);
-    EditorGameObject Instantiate(string prefabPath);
-    void ApplyToPrefab(EditorGameObject instance, string prefabPath);  // ApplyPrefabCommand
-    void RevertFromPrefab(EditorGameObject instance, string prefabPath);  // RevertPrefabCommand
-}
+public bool IsSceneDirty { get { lock (_stateLock) return _isSceneDirty; } }
+
+public void MarkSceneDirty()   { lock (_stateLock) _isSceneDirty = true;  EventBus.Publish(new SceneDirtyChangedEvent(true)); }
+public void MarkSceneClean()   { lock (_stateLock) _isSceneDirty = false; EventBus.Publish(new SceneDirtyChangedEvent(false)); }
 ```
 
-**Flujo:**
-- Menú contextual en jerarquía: `Save as Prefab...` → abre diálogo de nombre → serializa con `SceneSerializer` → `Content/Prefabs/nombre.prefab.json`
-- Drag & drop de `.prefab.json` desde Asset Browser al viewport → `PrefabManager.Instantiate()` → `CreateEntityCommand`
-- Prefabs en jerarquía marcados con icono azul (diferenciados de game objects normales)
-- Inspector de prefab muestra botones `Apply` y `Revert` en la cabecera
-- `Apply` → `ApplyPrefabCommand` (actualiza el `.prefab.json` con el estado actual de la instancia)
-- `Revert` → `RevertPrefabCommand` (restaura la instancia al estado del `.prefab.json`)
+`CommandStack.Execute()` llama `EditorContext.Instance.MarkSceneDirty()` tras cada comando si hay escena activa.
 
----
+Nuevos eventos:
+- `SceneDirtyChangedEvent(bool IsDirty)` — publicado cuando el estado dirty cambia
+- `SceneCreatedEvent(EditorScene Scene)` — publicado al crear una escena nueva
 
-## Fase 8 — Editor de Partículas
-
-### Objetivo
-Panel especializado para diseñar efectos de partículas con preview en tiempo real.
-
-### Clases del Kernel reutilizadas
-- `ParticleBuilder` — modelo de datos del efecto y serialización
-- `ParticleEffectWrapper` — update/draw del efecto en el viewport
-
-### Panel: `ParticleEditorPanel`
-
-Se abre al seleccionar un `GameEntity` con `ParticleEffectWrapper` adjunto, o desde el Asset Browser al hacer doble clic en un `.particles.json`.
-
-**Propiedades editables:**
-
-| Sección | Propiedades |
-|---------|-------------|
-| Emission | Rate (particles/sec), Burst count |
-| Lifetime | Min, Max (segundos) |
-| Velocity | Direction, Speed min/max, Spread angle |
-| Color | Start color, End color (gradiente) |
-| Size | Start size, End size |
-| Rotation | Initial rotation, Angular velocity |
-| Texture | Referencia a textura (acepta drop desde Asset Browser) |
-| Blend | Additive / Alpha blend |
-
-**Preview en vivo:** el viewport renderiza el efecto con `ParticleEffectWrapper.Update()` / `.Draw()` en tiempo real mientras se editan los valores.
-
-**Serialización:**
-- `ParticleBuilder.ToJson()` / `ParticleBuilder.FromJson()` ← añadir al Kernel en esta fase
-- Guardado en `Content/Particles/nombre.particles.json`
-
----
-
-## Fase 9 — Timeline de Animación
-
-### Objetivo
-Editor de animaciones de sprites con preview en tiempo real.
-
-### Clases del Kernel reutilizadas
-- `AnimatedSprite` — componente de animación
-- `Animation` — datos de frames
-- `TextureAtlas` — sprite sheet de origen
-- `TextureRegion` — región individual del atlas
-
-### Panel: `AnimationEditorPanel`
-
-Se abre al seleccionar un `GameEntity` con `AnimatedSprite`, o desde Asset Browser en un `.anim.json`.
-
-**Timeline horizontal:**
-- Regla de tiempo con fotogramas numerados
-- Cada frame representado como miniatura de su `TextureRegion`
-- Barra de playback: Play/Pause/Stop, checkbox Loop, velocidad (fps)
-
-**Operaciones:**
-- Añadir frame: drag & drop de `TextureRegion` desde Asset Browser al timeline
-- Eliminar frame: tecla Supr sobre el frame seleccionado
-- Reordenar: drag & drop entre posiciones del timeline
-- Editar duración: doble clic en un frame → `NumericUpDown` de duración en milisegundos
-
-**Preview en vivo:** el viewport muestra el `AnimatedSprite` reproduciéndose con los cambios en tiempo real.
-
-**Serialización:**
-- Guardar en `Content/Animations/nombre.anim.json`
-- `AnimatedSprite` en el Kernel carga este formato ← añadir `AnimatedSprite.LoadFromJson()` en esta fase
-
----
-
-## Fase 10 — Editor de Input Mapping
-
-### Objetivo
-Panel visual para configurar y exportar los bindings de input del juego.
-
-### Clases del Kernel reutilizadas
-- `InputActionMap` — mapa de acciones
-- `InputAction` — acción individual
-- `InputBinding` — binding de tecla/botón
-- `InputSerializer` — serialización/deserialización a JSON
-
-### Panel: `InputMappingPanel`
-
-**DataGridView** con columnas:
-
-| Columna | Tipo | Descripción |
-|---------|------|-------------|
-| Action | `TextBox` | Nombre de la acción |
-| Device | `ComboBox` | Keyboard, Mouse, GamePad |
-| Primary | `TextBox` readonly | Binding primario |
-| Secondary | `TextBox` readonly | Binding alternativo |
-
-**Captura de binding:** al hacer doble clic en Primary o Secondary:
-- Diálogo modal "Press any key..." que captura la siguiente tecla/botón pulsado
-- Actualiza el binding en el `InputActionMap`
-
-**Operaciones:**
-- Botón `+` → añadir acción nueva
-- Botón `−` → eliminar acción seleccionada
-- Drag & drop para reordenar
-
-**Exportación:**
-- Guardar con `InputSerializer.Serialize()` del Kernel → `Content/input.json`
-- El juego carga con `InputSerializer.Deserialize()` sin depender del editor
-
----
-
-## Fase 11 — Panel de Audio
-
-### Objetivo
-Gestión de assets de audio, configuración de pools y preview de reproducción.
-
-### Clases del Kernel reutilizadas
-- `AudioController` — backend de reproducción
-- `SoundEffectPool` — pooling por efecto
-- `AudioEmitter3D` — fuente de audio 3D
-- `AudioListener3D` — receptor de audio 3D
-
-### Panel: `AudioPanel`
-
-**Lista de assets de audio** (TreeView por categoría: SoundEffects, Music):
-- Iconos por tipo: onda de sonido, nota musical
-- Click → selecciona y muestra propiedades en panel derecho
-- Doble clic → Preview: reproduce con `AudioController`
-- Botón Stop → para reproducción actual
-
-**Propiedades de SoundEffect:**
-- Pool size: `NumericUpDown` → configura `SoundEffectPool` del Kernel
-- Volume, Pitch, Pan: `Slider` del Kernel (o `TrackBar` nativo)
-- Loop: `CheckBox`
-
-**Propiedades de AudioEmitter3D** (si el game object tiene 3D audio):
-- Position: igual que la del `TransformBehaviour`
-- DopplerScale, RolloffFactor, MaxDistance: `NumericUpDown`
-
-**Propiedades de AudioListener3D:**
-- Campos de posición y forward vector
-
----
-
-## Fase 12 — Panel de Traducciones y Project Settings
-
-### Objetivo
-Editor de localización integrado con `LocalizationManager`. Configuración de parámetros globales del proyecto.
-
-### Clases del Kernel reutilizadas
-- `LocalizationManager` — backend de localización
-- `ResolutionManager` — resolución virtual del juego
-- `PlatformManager` — modo ventana/fullscreen
-- `PostProcessEffect` — efectos de post-proceso
-- `TweeningManager` — valores por defecto de animación
-
-### Panel de traducciones
-
-- `DataGridView`: columna `Key` + una columna por idioma del proyecto
-- Datos desde `Localization/{lang}.json` cargados con `LocalizationManager` del Kernel
-- Edición inline con `SetPropertyCommand` para soporte de Undo/Redo
-- Botones: añadir clave, eliminar clave, añadir idioma
-- Formato JSON plano `{ "key": "valor" }` con soporte de namespaces por punto
-- Guardar con Ctrl+S
-
-### Project Settings (`Editor/project.json`)
-
-| Sección | Propiedades | Kernel |
-|---------|------------|--------|
-| Paths | ContentPath, LocalizationPath | — |
-| Resolution | VirtualWidth, VirtualHeight, Letterbox mode | `ResolutionManager` |
-| Window | Title, FullScreen, WindowMode | `PlatformManager` |
-| Localization | DefaultLocale, AvailableLocales | `LocalizationManager` |
-| Camera | DefaultZoom, WorldBounds, FollowMode | `Camera2D` |
-| PostProcess | EnabledEffects, EffectParams | `PostProcessEffect` |
-| Tweening | DefaultDuration, DefaultEasing | `TweeningManager` |
-| Grid | CellSize, SnapEnabled | `GizmoRenderer` (Fase 4) |
-| Build | OutputPath, DefaultPlatform | `PlatformManager` |
-
-**Sección Paths** — editable en Project Settings (rutas relativas al `RootPath`):
-- `ContentPath`: selector de carpeta; apunta a la carpeta de assets del juego (default `Content`)
-- `LocalizationPath`: selector de carpeta; apunta a los ficheros JSON de localización (default `Localization`)
-- Al cambiar cualquier ruta, el editor recarga el `AssetBrowserPanel` y el panel de traducciones
-
----
-
-## Fase 13 — Build y Export
-
-### Objetivo
-Pipeline de compilación y exportación del juego para plataforma objetivo.
-
-### Clases del Kernel reutilizadas
-- `PlatformManager` — detección de plataformas objetivo
-
-### Configuraciones de build
-
-Guardadas en `project.json` (sección Build):
-
-| Campo | Descripción |
-|-------|-------------|
-| `OutputPath` | Carpeta de salida del ejecutable |
-| `Platform` | Windows, Linux (vía `PlatformType` del Kernel) |
-| `Configuration` | Debug / Release |
-| `BundleAssets` | Incluir Content/ en el output |
-
-**Pipeline en `BuildManager`:**
-1. Compilar assets: `dotnet mgcb Content/Content.mgcb` (si hay cambios)
-2. Publicar: `dotnet publish -c {config} -r {rid} -o {outputPath}`
-3. Copiar `Content/` compilado a la carpeta de output
-4. Generar `game.manifest.json` con versión, plataforma, lista de assets
-5. Output en `ConsolePanel` en tiempo real via stream del proceso
-
-**`game.manifest.json`:**
-```json
-{
-  "name": "MyGame",
-  "version": "1.0.0",
-  "platform": "Windows",
-  "assets": ["Content/Textures/player.xnb", "..."]
-}
-```
-
----
-
-## Fase 14 — Generación de código y [EditorProperty]
-
-### Atributo `[EditorProperty]`
-
-Definido en `MonoGame.Editor.Core`:
+`EditorScene` añade:
 ```csharp
-[AttributeUsage(AttributeTargets.Property)]
-sealed class EditorPropertyAttribute : Attribute
-{
-    string? Label { get; init; }
-    float Min { get; init; } = float.MinValue;
-    float Max { get; init; } = float.MaxValue;
-    string? Tooltip { get; init; }
-}
+/// <summary>Optional 2D world bounds (pixels). Zero = unbounded.</summary>
+public EditorVector2 WorldSize { get; set; } = EditorVector2.Zero;
 ```
 
-El Inspector solo muestra propiedades marcadas con este atributo.
+### Proyecto: MonoGame.Editor.WinForms
 
-### CodeGen
+**`Dialogs/NewSceneDialog.cs`** (nuevo):
 
-Al pulsar `Create new...` en el popup de `Add Behaviour`:
-1. El editor solicita nombre de clase
-2. Genera `.cs` en `src/Behaviours/` con estructura mínima del Kernel:
-   ```csharp
-   namespace MyGame.Behaviours;
+| Control | Configuración |
+|---------|---------------|
+| `TableLayoutPanel` 4 filas | — |
+| "Scene Name:" + `TextBox _nameBox` | Fila 0 |
+| "World Width:" + `NumericUpDown _widthBox` | Fila 1, Min=0, Max=100000, Value=0 |
+| "World Height:" + `NumericUpDown _heightBox` | Fila 2 |
+| "Preview:" + `Label _previewLabel` | Fila 3, ForeColor=GrayText |
+| `FlowLayoutPanel` Cancel + OK | Dock=Bottom |
 
-   public sealed class NombreClass : GameBehaviour
-   {
-       [EditorProperty(Label = "Speed", Min = 0f, Max = 100f)]
-       public float Speed { get; set; } = 5f;
+Propiedades: `string SceneName`, `float WorldWidth`, `float WorldHeight`.
 
-       public override void Update(GameTime gameTime) { }
-   }
-   ```
-3. Abre el archivo en Visual Studio via `Process.Start`
-4. Al recompilar, `GameObjectRegistry` detecta el nuevo tipo automáticamente
+**`Panels/SceneManagerPanel.cs`** (nuevo):
+
+| Control | Configuración |
+|---------|---------------|
+| `ToolStrip` (Dock=Top) | New Scene / Open Scene / Delete Scene |
+| `ListView _sceneList` (Dock=Fill) | View=Details, FullRowSelect=true; columnas: "Name" 180px / "Modified" 130px |
+| `Label` (Dock=Bottom) | "{n} scenes in project" |
+
+Comportamiento: al `ProjectOpenedEvent` → escanear `ScenesPath/*.scene.json` y poblar la lista. Doble clic → carga escena (pregunta si hay cambios sin guardar). Escena activa marcada con item en negrita.
+
+**`EditorForm`** actualizado:
+- `Text` del Form: `"MonoGame Editor — {project.Name} — {scene.Name}{isSceneDirty ? " *" : ""}"` (suscribir `SceneDirtyChangedEvent`)
+- `FormClosing`: si `_context.IsSceneDirty` → `MessageBox` con Save/Discard/Cancel
+- `File > New Scene` → `NewSceneDialog` → `SceneCreatedEvent`
+- `File > Save Scene` (Ctrl+S) → guarda sin preguntar si `ScenePath` existe; llama `MarkSceneClean()` al terminar
+- `File > Save Scene As` (Ctrl+Shift+S) → siempre `SaveFileDialog`
 
 ---
 
-## Integración con Visual Studio
+## Fase 10 — Editor de Localización ✅ COMPLETADA
 
-- El proyecto del juego no referencia el editor
-- Mismo proceso: breakpoints en cualquier `GameBehaviour` sin configuración
-- Flujo: detener depuración → cambiar código → relanzar
-- `ConsolePanel` captura `Debug.WriteLine` y stdout
+### Objetivo
 
-**Estructura de carpetas del proyecto de juego:**
+Editor visual para los archivos de localización del Kernel (`{LocalizationPath}/*.json`). Formato compatible con `Alca.MonoGame.Kernel.Localization.LocalizationManager`.
+
+### Proyecto: MonoGame.Editor.Core
+
+**`Localization/LocalizationEditorModel.cs`**:
+
+```csharp
+public sealed class LocalizationEditorModel
+{
+    public IReadOnlyList<string> Locales { get; }
+    public IReadOnlyList<string> Keys { get; }
+
+    public static Task<LocalizationEditorModel> LoadAsync(string localizationPath);
+    public string GetValue(string locale, string key);
+    public void SetValue(string locale, string key, string value);
+    public Task SaveAsync();
+    public void AddKey(string key);
+    public void RemoveKey(string key);
+    public void AddLocale(string locale);
+}
 ```
-MyGame/
-├── MyGame.sln
-├── src/
-│   ├── MyGame.csproj             # Referencia a Alca.MonoGame.Kernel
-│   ├── Game.cs
-│   └── Behaviours/               # Generado por CodeGen, editado por el usuario
-├── Content/                      # Ruta configurable en Editor/project.json
-│   ├── Content.mgcb
-│   ├── Textures/
-│   ├── Audio/
-│   ├── Fonts/
-│   ├── Maps/
-│   ├── Particles/                # .particles.json
-│   └── Animations/               # .anim.json
-├── Localization/                 # Ruta configurable en Editor/project.json
-│   ├── es.json
-│   └── en.json
-└── Editor/                       # Ficheros del editor (ignorable en .gitignore si se desea)
-    ├── project.json              # Descriptor + Project Settings
-    ├── Scenes/                   # .json versionables con git
-    └── Prefabs/                  # .prefab.json
+
+**`Commands/SetLocalizationValueCommand.cs`**:
+```csharp
+public sealed class SetLocalizationValueCommand : IEditorCommand
+{
+    // Parameters: model, locale, key, oldValue, newValue
+    public string Description => $"Set [{_locale}][{_key}]";
+    // Execute: model.SetValue(locale, key, newValue)
+    // Undo:    model.SetValue(locale, key, oldValue)
+}
 ```
+
+Nuevo evento: `LocalizationLoadedEvent(LocalizationEditorModel Model)`.
+
+### Proyecto: MonoGame.Editor.WinForms
+
+**`Panels/LocalizationBrowserPanel.cs`** (nuevo):
+
+| Control | Configuración |
+|---------|---------------|
+| `ToolStrip` (Dock=Top) | Add Key / Remove Key / Add Locale / Import .json / Export .csv / Save |
+| `TextBox _filterBox` (Dock=Top) | PlaceholderText="Filter keys..." |
+| `DataGridView _grid` (Dock=Fill) | AllowUserToAddRows=false, AutoSizeColumnsMode=Fill |
+| `Label` (Dock=Bottom) | "{n} keys, {m} locales" |
+
+Configuración del grid:
+- Primera columna: `DataGridViewTextBoxColumn` "Key", ReadOnly=**true**, Width=200, `DefaultCellStyle.BackColor=ControlLight`
+- Columnas de locale: una `DataGridViewTextBoxColumn` editable por locale
+- `CellEndEdit` → `SetLocalizationValueCommand` via `CommandStack`
+- Filtrado: `row.Visible` alternado según filtro (sin rebuild)
+
+Suscripción: `ProjectOpenedEvent` → `LoadAsync(project.LocalizationPath)` → poblar grid.
+
+---
+
+## Fase 11 — Editor de Mapas de Input ✅ COMPLETADA
+
+### Objetivo
+
+Panel visual para configurar los bindings de input. Reutiliza `InputActionMap`, `InputSerializer` del Kernel.
+
+### Proyecto: MonoGame.Editor.Core
+
+- `Input/InputEditorModel.cs` — wrapper de `InputActionMap` con operaciones orientadas al editor
+- `Commands/AddInputActionCommand.cs`, `RemoveInputActionCommand.cs`, `AddInputBindingCommand.cs`, `RemoveInputBindingCommand.cs`
+- `Events/InputMapLoadedEvent.cs`
+
+### Proyecto: MonoGame.Editor.WinForms
+
+**`Panels/InputMapEditorPanel.cs`** (nuevo) — `SplitContainer` vertical:
+
+**Panel izquierdo (TreeView)**:
+
+| Control | Configuración |
+|---------|---------------|
+| `ToolStrip` | Load File / Save File / Add Action / Remove Action |
+| `ComboBox _mapFileSelector` (Dock=Top) | Archivos `.input.json` del proyecto |
+| `TreeView _actionTree` (Dock=Fill) | FullRowSelect=true, HideSelection=false |
+
+**Panel derecho (DataGridView)**:
+
+| Control | Configuración |
+|---------|---------------|
+| `Label` cabecera | Nombre de la acción seleccionada, Font=Bold |
+| `ToolStrip` | Add Binding / Remove Binding |
+| `DataGridView _bindingsGrid` | — |
+
+Columnas del grid:
+
+| Columna | Tipo | Valores |
+|---------|------|---------|
+| "Device" | `DataGridViewComboBoxColumn` | Keyboard / Gamepad / Mouse |
+| "Key / Button" | `DataGridViewComboBoxColumn` (dinámico) | `Keys` enum / `Buttons` enum / `MouseButtons` enum |
+
+`CellValueChanged` en "Device" actualiza los items de la columna "Key / Button" de esa fila.
+
+Suscripción: `ProjectOpenedEvent` → escanear `GameSourcePath` buscando `*.input.json` → poblar `_mapFileSelector`.
+
+---
+
+## Fase 12 — Project Settings y Build ✅ COMPLETADA
+
+### Objetivo
+
+Centralizar todas las configuraciones del proyecto en un diálogo profesional. Mejorar el pipeline de build con salida coloreada. Permitir lanzar el juego desde el editor.
+
+### Proyecto: MonoGame.Editor.Core
+
+**`Project/ProjectSettings.cs`**:
+
+```csharp
+public sealed class ProjectSettings
+{
+    public string RootNamespace { get; set; } = string.Empty;
+    public string GeneratedCodeFolder { get; set; } = "Generated";
+    public bool GenerateOnSave { get; set; } = false;
+    public string DefaultLocale { get; set; } = "en-US";
+    public List<string> SupportedLocales { get; set; } = ["en-US"];
+    public string BuildConfiguration { get; set; } = "Debug";
+
+    public static Task<ProjectSettings> LoadAsync(EditorProject project);
+    public Task SaveAsync(EditorProject project);
+}
+```
+
+Se serializa en `{EditorPath}/settings.json`.
+
+`MgcbRunner` extendido con:
+```csharp
+public Task<int> RunDotnetBuildAsync(string csprojPath, string configuration, Action<string> onLine);
+```
+
+Nuevo evento: `BuildOutputLineEvent(string Line, bool IsError)`.
+
+### Proyecto: MonoGame.Editor.WinForms
+
+**`Dialogs/ProjectSettingsDialog.cs`** (nuevo) — `TabControl` con 4 pestañas:
+
+**Pestaña "General"**:
+
+| Control | Configuración |
+|---------|---------------|
+| "Project Name:" + `TextBox` | Editable |
+| "Version:" + `TextBox` | Editable |
+| "Game .csproj:" + browse row | `OpenFileDialog(*.csproj)` |
+| "Editor folder:" + `TextBox` RO | Muestra `project.EditorPath` |
+| "Root namespace:" + `TextBox` | Para CodeGen; guarda en `ProjectSettings` |
+
+**Pestaña "Content"**:
+
+| Control | Configuración |
+|---------|---------------|
+| "Content folder:" + browse row | `FolderBrowserDialog` |
+| "MGCB file:" + browse row | Auto-detectado como `{ContentPath}/Content.mgcb` |
+| "Build config:" + `ComboBox` | Debug / Release |
+| `CheckBox` "Auto-build on Play" | — |
+
+**Pestaña "Localization"**:
+
+| Control | Configuración |
+|---------|---------------|
+| "Localization folder:" + browse row | — |
+| "Default locale:" + `ComboBox` | Locales detectados + entrada manual |
+| `DataGridView` "Supported locales" | Una columna "Locale", AllowUserToAddRows=true |
+
+**Pestaña "Code Generation"**:
+
+| Control | Configuración |
+|---------|---------------|
+| "Output folder:" + `TextBox` | Relativo a `GameSourcePath`; default "Generated" |
+| `CheckBox` "Generate code on Scene Save" | Vinculado a `ProjectSettings.GenerateOnSave` |
+| "Preview output path:" + `Label` | Ruta calculada dinámicamente, ForeColor=GrayText |
+| `Button` "Generate All Scenes Now" | Deshabilitado hasta Phase 14 |
+
+Acceso: menú `Project > Project Settings...`
+
+**Menús nuevos en `EditorForm`**:
+- `Project > Build Game` (Ctrl+B) → `MgcbRunner.RunDotnetBuildAsync` → `_consolePanel.AppendBuildLine`
+- `Project > Run Game` (Ctrl+F5) → `Process.Start("dotnet", $"run --project \"{GameCsprojPath}\"")`
+
+---
+
+## Fase 13 — Infraestructura de CodeGen ✅ COMPLETADA
+
+### Objetivo
+
+Construir la capa de servicios que transforma el estado del editor en código C# siguiendo los patrones del Kernel. Esta fase sienta las bases; la integración completa ocurre en Fase 14.
+
+### Proyecto: MonoGame.Editor.Core
+
+**Nueva carpeta `CodeGen/`:**
+
+**`CodeGen/ICodeGenService.cs`**:
+```csharp
+public interface ICodeGenService
+{
+    /// <summary>
+    /// Generates or overwrites the partial class initializer for scene.
+    /// Output: {GameSourcePath}/{GeneratedFolder}/Scenes/{SceneName}Scene.Generated.cs
+    /// </summary>
+    Task<CodeGenResult> GenerateSceneAsync(
+        EditorScene scene,
+        EditorProject project,
+        ProjectSettings settings,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Scaffolds a new GameBehaviour subclass skeleton.
+    /// </summary>
+    Task<CodeGenResult> GenerateBehaviourSkeletonAsync(
+        string className,
+        string namespaceName,
+        string relativeFolder,
+        IReadOnlyList<string> lifecycleMethodsToOverride,
+        EditorProject project,
+        CancellationToken cancellationToken = default);
+}
+```
+
+**`CodeGen/CodeGenResult.cs`**:
+```csharp
+public sealed record CodeGenResult(
+    bool    Success,
+    string  OutputPath,
+    string? ErrorMessage = null);
+```
+
+**`CodeGen/SceneCodeGenerator.cs`** (implementa `ICodeGenService`):
+
+- Genera `{SceneName}Scene.Generated.cs` con método `OnLoad(GameWorld world)` (ver Fase 14 para el patrón exacto)
+- Usa `StringBuilder` (sin LINQ en el bucle de generación)
+- Calcula hash MD5 del contenido antes de escribir: si coincide con el archivo existente, no sobreescribe (preserva timestamps)
+- Si el archivo es nuevo: llama `CsprojFileEditor.EnsureFileIncludedAsync`
+- Resuelve colisiones de nombres de variable añadiendo sufijo `_0`, `_1`, etc.
+- Omite asignaciones de propiedades cuando el valor del editor coincide con el default del tipo
+
+**`CodeGen/BehaviourSkeletonGenerator.cs`**:
+
+Template generado:
+```csharp
+// Generated by MonoGame Editor
+using Alca.MonoGame.Kernel.ECS;
+using Microsoft.Xna.Framework;
+
+namespace {namespaceName};
+
+/// <summary>{className} behaviour.</summary>
+public sealed class {className} : GameBehaviour
+{
+    // Lifecycle methods elegidos por el usuario...
+}
+```
+
+**`CodeGen/CsprojFileEditor.cs`**:
+```csharp
+public static class CsprojFileEditor
+{
+    /// <summary>
+    /// Verifica si el .csproj usa un Glob que cubre el archivo.
+    /// Si no, añade un Compile Include explícito. Usa XmlDocument (sin Roslyn).
+    /// La mayoría de proyectos SDK-style usan wildcard implícito — verificar antes de editar.
+    /// </summary>
+    public static Task EnsureFileIncludedAsync(string csprojPath, string absoluteFilePath);
+
+    public static bool IsFileCoveredByGlob(string csprojPath, string absoluteFilePath);
+}
+```
+
+**`CodeGen/GameBehaviourScanner.cs`**:
+```csharp
+public sealed class GameBehaviourScanner
+{
+    /// <summary>Escanea una DLL compilada buscando subclases de GameBehaviour.</summary>
+    public static Task<IReadOnlyDictionary<string, TypeDescriptor>> ScanAssemblyAsync(string assemblyPath);
+
+    /// <summary>
+    /// Parsea .cs de sourcePath buscando clases que heredan GameBehaviour
+    /// (parseo de texto simple, sin Roslyn — cubre el 95% de casos).
+    /// </summary>
+    public static Task<IReadOnlyList<string>> ScanSourceAsync(string sourcePath);
+}
+```
+
+`TypeDescriptor` (record): `FullName`, `ShortName`, `Namespace`, `SourceFilePath?`.
+
+Nuevos eventos:
+```csharp
+public sealed record CodeGenStartedEvent(string SceneName) : IEditorEvent;
+public sealed record CodeGenCompletedEvent(CodeGenResult Result) : IEditorEvent;
+```
+
+Nuevo comando: `GenerateSceneCodeCommand` (Execute: llama `ICodeGenService.GenerateSceneAsync`; Undo: restaura backup del archivo previo si existía).
+
+### Proyecto: MonoGame.Editor.WinForms
+
+**`Dialogs/NewBehaviourDialog.cs`** (nuevo):
+
+| Control | Configuración |
+|---------|---------------|
+| "Class name:" + `TextBox _classNameBox` | Validación: solo `[A-Za-z][A-Za-z0-9_]*` |
+| "Namespace:" + `ComboBox _namespaceBox` | Items: namespaces detectados + texto libre |
+| "Subfolder:" + row TextBox+Browse | Relativo a `GameSourcePath` |
+| "Override methods:" + `CheckedListBox _methodsList` | Awake / Start / Update / Draw / OnDestroy |
+| Cancel + Create | OK habilitado cuando ClassName válido |
+
+Accesible desde `InspectorPanel` ("Create New..." en AddBehaviourDialog) y desde menú `Project > New Behaviour...`.
+
+**`AddBehaviourDialog` mejorado**:
+
+Reemplazar `ListBox` plano por `TreeView` agrupado por namespace (nodo = namespace, hijos = nombre corto). `TextBox` de búsqueda que filtra el árbol. Botón inferior "Create New..." → abre `NewBehaviourDialog`.
+
+---
+
+## Fase 14 — CodeGen Completo: Integración Total ✅ COMPLETADA
+
+### Objetivo
+
+El editor genera y mantiene código C# funcional del juego. Cada escena guardada produce un archivo `.Generated.cs` que registra entidades y behaviours siguiendo los patrones de `Alca.MonoGame.Kernel`. El desarrollador añade su lógica en la parte no generada de la clase parcial.
+
+### Patrón de código generado
+
+Para una escena "Gameplay" con un "Player" (`PlayerMovementBehaviour` Speed=5.0) y un "HUD_Root" con hijo "HealthBar":
+
+**`Generated/Scenes/GameplayScene.Generated.cs`:**
+```csharp
+// AUTO-GENERATED by MonoGame Editor 2026-05-25T10:30:00 — DO NOT EDIT MANUALLY
+// Source: Editor/Scenes/Gameplay.scene.json
+// Safe to commit; regenerated automatically on scene save.
+using Alca.MonoGame.Kernel.ECS;
+using Microsoft.Xna.Framework;
+using MyGame.Behaviours;
+
+namespace MyGame.Scenes;
+
+public sealed partial class GameplayScene : Scene
+{
+    /// <summary>Creates and registers all entities defined in the editor scene.</summary>
+    protected override void OnLoad(GameWorld world)
+    {
+        // ── Entity: Player ──────────────────────────────────────────────────────
+        var player_0 = world.CreateEntity("Player", new Vector2(100f, 200f));
+        var playerMovement_0 = player_0.AddComponent<PlayerMovementBehaviour>();
+        playerMovement_0.Speed = 5f;
+
+        // ── Entity: HUD_Root ─────────────────────────────────────────────────────
+        var hudRoot_1 = world.CreateEntity("HUD_Root", Vector2.Zero);
+        var healthBar_2 = world.CreateEntity("HealthBar", new Vector2(10f, 10f));
+        healthBar_2.SetParent(hudRoot_1);
+    }
+}
+```
+
+**`Scenes/GameplayScene.cs`** (archivo manual, **nunca sobreescrito**):
+```csharp
+namespace MyGame.Scenes;
+
+public sealed partial class GameplayScene : Scene
+{
+    public override void Initialize()
+    {
+        base.Initialize();
+        // Lógica personalizada del desarrollador
+    }
+}
+```
+
+### Proyecto: MonoGame.Editor.Core
+
+`SceneCodeGenerator` completado con:
+- Soporte para jerarquías de n niveles vía `entity.SetParent(parentEntity)`
+- Generación automática de `using` statements basada en namespaces de los tipos de behaviour
+- Soporte de tipos: `int`, `float`, `bool`, `string`, `Vector2`, `Vector3`, `Color`, `enum`
+- Rutas de asset emitidas como string literal: `SpriteName = "Textures/player"`
+- Propiedades con valor default del tipo: omitir línea para mantener el código limpio
+
+`ProjectSettings` usado para resolver:
+- `RootNamespace` → namespace de la clase (`{RootNamespace}.Scenes`)
+- `GeneratedCodeFolder` → subcarpeta dentro de `GameSourcePath`
+- `GenerateOnSave` → flag de generación automática
+
+`GameObjectRegistry.Scan()` complementado con `ScanFromAssemblyAsync(string dllPath)`: tras `Project > Build Game` exitoso, rescan automático. Los tipos pending (detectados en source pero no compilados aún) se muestran en `AddBehaviourDialog` con estilo gris itálico.
+
+### Proyecto: MonoGame.Editor.WinForms
+
+**`EditorForm.OnFileSaveProjectClick`** integración CodeGen:
+
+```csharp
+// Después de guardar exitosamente el .scene.json:
+if (_settings.GenerateOnSave && !string.IsNullOrEmpty(_context.ActiveProject?.GameCsprojPath))
+{
+    _context.EventBus.Publish(new CodeGenStartedEvent(scene.Name));
+    _statusLabel.Text = "Generating code...";
+
+    CodeGenResult result = await _codeGenService
+        .GenerateSceneAsync(scene, project, _settings)
+        .ConfigureAwait(true);
+
+    if (result.Success)
+        _consolePanel.AppendLine($"[CodeGen] Generated: {result.OutputPath}", LogLevel.Info);
+    else
+        _consolePanel.AppendLine($"[CodeGen] Error: {result.ErrorMessage}", LogLevel.Error);
+
+    _context.EventBus.Publish(new CodeGenCompletedEvent(result));
+    _statusLabel.Text = result.Success ? "Saved + code generated." : "Saved (code gen failed).";
+}
+```
+
+**Menús nuevos en `EditorForm`**:
+- `Project > Generate Scene Code` (Ctrl+G) — ejecuta `GenerateSceneCodeCommand` para la escena activa
+- `Project > Generate All Scenes` — itera sobre todas las `.scene.json` y genera cada una
+- Separator
+- `Project > Rescan Behaviours` — ejecuta `GameBehaviourScanner.ScanAssemblyAsync` y actualiza `GameObjectRegistry`
+
+**`Dialogs/CodeGenProgressDialog.cs`** (nuevo — form no-modal, esquina inferior derecha):
+
+| Control | Configuración |
+|---------|---------------|
+| `Label` "Generating code..." | — |
+| `ProgressBar _bar` | Style=Marquee durante operación; Blocks al terminar |
+| `ListView _fileList` | View=Details; columnas "File" 220px / "Status" 70px |
+| `Button` "Close" | Habilitado solo al terminar |
+
+**`AssetBrowserPanel`**: archivos `.Generated.cs` muestran icono turquesa + tooltip "Auto-generated by MonoGame Editor — do not edit manually".
+
+---
+
+## Fase 15 — Play / Pause / Stop ✅ COMPLETADA
+
+### Objetivo
+
+Implementar la máquina de estados Editing → Playing → Paused → Editing con snapshot/restore de escena y game loop activo en el viewport.
+
+### Comportamiento por estado
+
+| Estado | Update | Draw | Gizmos |
+|--------|--------|------|--------|
+| Editing | — | Editor overlay | ✅ |
+| Playing | `GameWorld.Update()` | `GameWorld.Draw()` + SpriteBatch | ❌ |
+| Paused | — | `GameWorld.Draw()` + SpriteBatch | ✅ |
+| Stop → Editing | — | — | ✅ (snapshot restaurado) |
+
+### Proyecto: MonoGame.Editor.Core
+
+**`PlayMode/PlayModeRunner.cs`** (nuevo):
+- `EnsureInitialized(GraphicsDevice)` — crea `SpriteBatch` en el render thread
+- `Update(TimeSpan elapsed)` — avanza `GameWorld.Update()` con delta time acumulado
+- `Draw(TimeSpan elapsed)` — llama `SpriteBatch.Begin/GameWorld.Draw/End` con try-catch (behaviours sin content fallan silenciosamente)
+- `IDisposable` — descarta SpriteBatch
+
+**`PlayMode/SceneToWorldConverter.cs`** (nuevo):
+- `Convert(EditorScene, GameObjectRegistry)` → `GameWorld`
+- Conversión recursiva de jerarquía `EditorGameObject` → `GameEntity` con `SetParent`
+- Instanciación de behaviours via `Activator.CreateInstance` + `GameEntity.Add<T>` via `MakeGenericMethod`
+- Deserialización de propiedades `JsonElement` → tipos primitivos, Vector2/3, Color, enum
+
+**`EditorContext.cs`** ampliado con:
+- `TakePlaySnapshot()` — serializa `ActiveScene` a JSON en memoria
+- `RestoreFromSnapshot()` — deserializa y devuelve el snapshot
+- `ClearPlaySnapshot()` — limpia el snapshot tras restaurar
+
+### Proyecto: MonoGame.Editor.WinForms
+
+**`EditorForm.cs`** ampliado:
+- Campo `_playRunner`
+- `OnPlayClick` guarda contra escena nula (MessageBox informativo)
+- `OnEditorStateChanged` llama `StartPlayMode()` al entrar en Playing desde Editing, y `StopPlayMode()` al volver a Editing
+- `StartPlayMode()` — toma snapshot, crea `PlayModeRunner`
+- `StopPlayMode()` — descarta runner, restaura snapshot via `SetActiveScene`
+- `OnViewportRenderFrame` redirige a `_playRunner` durante Playing/Paused; en Paused también dibuja gizmos
+
+---
+
+## Resumen de archivos por fase
+
+| Fase | Archivos Core | Archivos WinForms |
+|------|---------------|-------------------|
+| **0.5** | `EditorProject.cs`, `ProjectManager.cs`, `GameCsprojChangedEvent.cs` | `NewProjectDialog.cs`, `NewProjectDialog.Designer.cs`, `EditorForm.cs` |
+| **8a** | `LogLevel.cs`, `LogEntry.cs`, `IEditorLogger.cs`, `LogEntryAddedEvent.cs`, `EditorContext.cs` | `ConsolePanel.cs` |
+| **8b** | — | `SceneHierarchyPanel.cs` |
+| **8c** | `EditorGameObject.cs`, `SetTagsCommand.cs` | `InspectorPanel.cs` |
+| **8d** | — | `AssetBrowserPanel.cs` |
+| **9** | `EditorContext.cs`, `EditorScene.cs`, `SceneDirtyChangedEvent.cs`, `SceneCreatedEvent.cs` | `NewSceneDialog.cs+Designer`, `SceneManagerPanel.cs`, `EditorForm.cs` |
+| **10** | `LocalizationEditorModel.cs`, `SetLocalizationValueCommand.cs`, `LocalizationLoadedEvent.cs` | `LocalizationBrowserPanel.cs` |
+| **11** | `InputEditorModel.cs`, 4 Input Commands, `InputMapLoadedEvent.cs` | `InputMapEditorPanel.cs` |
+| **12** | `ProjectSettings.cs`, `MgcbRunner.cs`, `BuildOutputLineEvent.cs` | `ProjectSettingsDialog.cs+Designer`, `EditorForm.cs` |
+| **13** | `ICodeGenService.cs`, `CodeGenResult.cs`, `SceneCodeGenerator.cs`, `BehaviourSkeletonGenerator.cs`, `CsprojFileEditor.cs`, `GameBehaviourScanner.cs`, `TypeDescriptor.cs`, `CodeGenStartedEvent.cs`, `CodeGenCompletedEvent.cs`, `GenerateSceneCodeCommand.cs` | `NewBehaviourDialog.cs+Designer`, `AddBehaviourDialog.cs` |
+| **14** | `SceneCodeGenerator.cs` (completar), `GameObjectRegistry.cs` (extender) | `EditorForm.cs`, `InspectorPanel.cs`, `AssetBrowserPanel.cs`, `CodeGenProgressDialog.cs` |
 
 ---
 
@@ -836,28 +1043,58 @@ MyGame/
 |------|-------------------|
 | 0 | `EventBus` |
 | 1 | `Camera2D`, `InputActionMap`, `InputSerializer`, `ResolutionManager` |
-| 2 | — |
 | 3 | `GameWorld`, `GameEntity`, `GameBehaviour`, `TransformBehaviour`, `GameEntityPool` |
 | 4 | `Camera2D`, `DrawHelper`, `PrimitiveBatch`, `GeometryUtility`, `ResolutionManager` |
 | 5 | `AsyncContentLoader`, `ContentLoadGroup`, `Sprite` |
 | 6 | `TiledMapRenderer`, `TiledObjectLayer` |
-| 7 | `SceneSerializer` (Editor.Core) |
-| 8 | `ParticleBuilder`, `ParticleEffectWrapper` |
-| 9 | `AnimatedSprite`, `Animation`, `TextureAtlas`, `TextureRegion` |
-| 10 | `InputActionMap`, `InputAction`, `InputBinding`, `InputSerializer` |
-| 11 | `AudioController`, `SoundEffectPool`, `AudioEmitter3D`, `AudioListener3D` |
-| 12 | `LocalizationManager`, `ResolutionManager`, `PlatformManager`, `PostProcessEffect`, `TweeningManager` |
-| 13 | `PlatformManager` |
-| 14 | `GameBehaviour` (base de clases generadas) |
+| 8 | — |
+| 9 | `SceneManager` (referencia conceptual de ciclo de vida) |
+| 10 | `LocalizationManager` (formato de ficheros) |
+| 11 | `InputActionMap`, `InputAction`, `InputBinding`, `InputSerializer` |
+| 12 | `ResolutionManager`, `PlatformManager` |
+| 13–14 | `GameWorld`, `GameEntity`, `GameBehaviour`, `TransformBehaviour`, `Scene` (generación de código) |
+
+---
+
+## Estructura de carpetas del proyecto de juego objetivo
+
+```
+MyGame/
+├── MyGame.sln
+├── src/
+│   ├── MyGame.csproj             # Apuntado por gameCsprojPath en project.json
+│   ├── Game.cs
+│   ├── Behaviours/               # Generado por CodeGen o añadido manualmente
+│   └── Scenes/
+│       ├── GameplayScene.cs      # Parte manual (partial class)
+│       └── Generated/
+│           └── GameplayScene.Generated.cs  # AUTO-GENERADO por el editor
+├── Content/                      # Ruta configurable
+│   ├── Content.mgcb
+│   ├── Textures/
+│   ├── Audio/
+│   ├── Fonts/
+│   └── Maps/
+├── Localization/                 # Ruta configurable
+│   ├── es.json
+│   └── en.json
+└── Editor/                       # Ficheros del editor (versionables con git)
+    ├── project.json              # Descriptor + rutas al proyecto de juego
+    ├── settings.json             # ProjectSettings (namespace, build config, etc.)
+    ├── Scenes/
+    └── Prefabs/
+```
 
 ---
 
 ## Convenciones técnicas
 
-- Comunicación entre paneles exclusivamente via `IEditorEventBus` — los paneles nunca se llaman directamente entre sí
+- Comunicación entre paneles exclusivamente via `IEditorEventBus`
 - Todas las operaciones de edición van a `CommandStack` para soporte de Undo/Redo
-- `EditorContext` (singleton) como fuente de verdad: escena activa, selección, estado, proyecto
+- `EditorContext` como fuente de verdad: escena activa, selección, estado, proyecto
 - Los `.json` de escena son la fuente de verdad para edición (human-readable, versionables con git)
+- Los `.Generated.cs` son artefactos derivables del `.scene.json` — seguros para commitear pero regenerables
 - El Kernel gestiona la ejecución del juego; el editor construye sobre él sin duplicar código
 - Todos los textos de la UI del editor en inglés
-- Las adiciones al Kernel necesarias (e.g. `ParticleBuilder.ToJson()`, `AnimatedSprite.LoadFromJson()`) se implementan en el Kernel antes de la fase correspondiente
+- Clases `sealed` por defecto, campos `_camelCase`, namespaces file-scoped
+- Sin LINQ en bucles de generación de código (`StringBuilder` directo)

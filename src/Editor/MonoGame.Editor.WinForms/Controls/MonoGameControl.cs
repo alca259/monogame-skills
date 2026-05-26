@@ -3,13 +3,19 @@ using System.Diagnostics;
 namespace MonoGame.Editor.WinForms.Controls;
 
 /// <summary>Arguments passed to the <see cref="MonoGameControl.RenderFrame"/> event.</summary>
-public sealed class RenderEventArgs(GraphicsDevice graphicsDevice, TimeSpan elapsed) : EventArgs
+public sealed class RenderEventArgs(GraphicsDevice graphicsDevice, TimeSpan elapsed, int width, int height) : EventArgs
 {
     /// <summary>The active graphics device, usable for drawing operations.</summary>
     public GraphicsDevice GraphicsDevice { get; } = graphicsDevice;
 
     /// <summary>Time elapsed since the previous frame.</summary>
     public TimeSpan Elapsed { get; } = elapsed;
+
+    /// <summary>Current render-target width in pixels (safe to read from render thread).</summary>
+    public int Width { get; } = width;
+
+    /// <summary>Current render-target height in pixels (safe to read from render thread).</summary>
+    public int Height { get; } = height;
 }
 
 /// <summary>
@@ -23,6 +29,7 @@ public sealed class MonoGameControl : Control
     private Thread? _renderThread;
     private volatile bool _running;
     private volatile bool _resizePending;
+    private IntPtr _windowHandle;
 
     private readonly Lock _resizeLock = new();
     private int _pendingWidth;
@@ -30,10 +37,21 @@ public sealed class MonoGameControl : Control
 
     // Camera input state (written on UI thread, read on render thread — floats are atomic)
     private bool _panActive;
+    private bool _handToolActive;
     private System.Drawing.Point _lastPanPos;
 
     /// <summary>Editor camera used to transform the viewport.</summary>
     public EditorCamera2D Camera { get; } = new();
+
+    /// <summary>
+    /// When <c>false</c> the render loop ticks but skips all drawing.
+    /// Set to <c>false</c> for the inactive tab so only the visible viewport renders.
+    /// </summary>
+    public volatile bool IsActive = true;
+
+    /// <summary>Color used to clear the render target at the start of each frame.</summary>
+    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+    public Microsoft.Xna.Framework.Color ClearColor { get; set; } = new Microsoft.Xna.Framework.Color(30, 30, 30);
 
     /// <summary>
     /// Raised from the render thread once per frame, after the device is cleared.
@@ -41,12 +59,38 @@ public sealed class MonoGameControl : Control
     /// </summary>
     public event EventHandler<RenderEventArgs>? RenderFrame;
 
+    /// <summary>When true, left mouse drag pans the scene like a hand tool.</summary>
+    [System.ComponentModel.Browsable(false)]
+    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+    public bool HandToolEnabled
+    {
+        get => _handToolActive;
+        set => _handToolActive = value;
+    }
+
+    public MonoGameControl()
+    {
+        SetStyle(
+            ControlStyles.AllPaintingInWmPaint |
+            ControlStyles.UserPaint |
+            ControlStyles.Opaque,
+            true);
+        UpdateStyles();
+    }
+
+    /// <inheritdoc/>
+    protected override void OnPaintBackground(PaintEventArgs e) { }
+
+    /// <inheritdoc/>
+    protected override void OnPaint(PaintEventArgs e) { }
+
     /// <inheritdoc/>
     protected override void OnHandleCreated(EventArgs e)
     {
         base.OnHandleCreated(e);
         if (DesignMode) return;
 
+        _windowHandle = Handle;
         InitializeGraphics();
         StartRenderLoop();
     }
@@ -58,6 +102,7 @@ public sealed class MonoGameControl : Control
         _renderThread?.Join(2000);
         _swapChain?.Dispose();
         _graphicsDevice?.Dispose();
+        _windowHandle = IntPtr.Zero;
         base.OnHandleDestroyed(e);
     }
 
@@ -82,7 +127,7 @@ public sealed class MonoGameControl : Control
     protected override void OnMouseDown(MouseEventArgs e)
     {
         base.OnMouseDown(e);
-        if (e.Button == MouseButtons.Middle)
+        if (e.Button == MouseButtons.Middle || (_handToolActive && e.Button == MouseButtons.Left))
         {
             _panActive = true;
             _lastPanPos = e.Location;
@@ -106,7 +151,7 @@ public sealed class MonoGameControl : Control
     protected override void OnMouseUp(MouseEventArgs e)
     {
         base.OnMouseUp(e);
-        if (e.Button == MouseButtons.Middle)
+        if (e.Button == MouseButtons.Middle || (_handToolActive && e.Button == MouseButtons.Left))
             _panActive = false;
     }
 
@@ -129,6 +174,9 @@ public sealed class MonoGameControl : Control
     {
         try
         {
+            if (_windowHandle == IntPtr.Zero)
+                return;
+
             int w = Math.Max(1, ClientSize.Width);
             int h = Math.Max(1, ClientSize.Height);
 
@@ -138,13 +186,13 @@ public sealed class MonoGameControl : Control
                 BackBufferHeight = h,
                 BackBufferFormat = SurfaceFormat.Color,
                 DepthStencilFormat = DepthFormat.Depth24,
-                DeviceWindowHandle = Handle,
+                DeviceWindowHandle = _windowHandle,
                 PresentationInterval = PresentInterval.Immediate,
                 IsFullScreen = false,
             };
 
             _graphicsDevice = new GraphicsDevice(GraphicsAdapter.DefaultAdapter, GraphicsProfile.HiDef, pp);
-            _swapChain = new SwapChainRenderTarget(_graphicsDevice, Handle, w, h);
+            _swapChain = new SwapChainRenderTarget(_graphicsDevice, _windowHandle, w, h);
         }
         catch (Exception ex)
         {
@@ -209,23 +257,27 @@ public sealed class MonoGameControl : Control
 
         try
         {
+            if (_windowHandle == IntPtr.Zero)
+                return;
+
             _swapChain?.Dispose();
-            _swapChain = new SwapChainRenderTarget(_graphicsDevice!, Handle, w, h);
+            _swapChain = new SwapChainRenderTarget(_graphicsDevice!, _windowHandle, w, h);
         }
         catch { /* ignore resize errors */ }
     }
 
     private void DoRender(TimeSpan elapsed)
     {
+        if (!IsActive) return;
         if (_graphicsDevice == null || _swapChain == null || _swapChain.IsDisposed)
             return;
 
         try
         {
             _graphicsDevice.SetRenderTarget(_swapChain);
-            _graphicsDevice.Clear(new Microsoft.Xna.Framework.Color(30, 30, 30));
+            _graphicsDevice.Clear(ClearColor);
 
-            RenderFrame?.Invoke(this, new RenderEventArgs(_graphicsDevice, elapsed));
+            RenderFrame?.Invoke(this, new RenderEventArgs(_graphicsDevice, elapsed, _swapChain.Width, _swapChain.Height));
 
             _graphicsDevice.SetRenderTarget(null);
             _swapChain.Present();

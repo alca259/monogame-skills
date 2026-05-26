@@ -42,6 +42,15 @@ public sealed class EditorPreferences
     /// <summary>Whether the console panel is visible.</summary>
     public bool ConsoleVisible { get; set; } = true;
 
+    /// <summary>Whether the scene manager panel is visible.</summary>
+    public bool SceneManagerVisible { get; set; } = true;
+
+    /// <summary>Whether the localization browser panel is visible.</summary>
+    public bool LocalizationBrowserVisible { get; set; } = false;
+
+    /// <summary>Whether the input map editor panel is visible.</summary>
+    public bool InputMapEditorVisible { get; set; } = false;
+
     /// <summary>Absolute path of the last project opened, or empty if none.</summary>
     public string LastProjectPath { get; set; } = string.Empty;
 
@@ -50,6 +59,9 @@ public sealed class EditorPreferences
 
     /// <summary>Width of the folder tree inside the asset browser panel in pixels.</summary>
     public int AssetBrowserSplitterDistance { get; set; } = 180;
+
+    /// <summary>Persists which behaviour sections in the inspector are collapsed. Key = section name.</summary>
+    public Dictionary<string, bool> BehaviourSectionCollapsed { get; set; } = [];
 
     /// <summary>
     /// Adds <paramref name="path"/> to the front of <see cref="RecentProjects"/>, removes any
@@ -95,8 +107,14 @@ public sealed class EditorPreferences
             InspectorVisible = loaded.InspectorVisible;
             AssetBrowserVisible = loaded.AssetBrowserVisible;
             ConsoleVisible = loaded.ConsoleVisible;
+            SceneManagerVisible = loaded.SceneManagerVisible;
+            LocalizationBrowserVisible = loaded.LocalizationBrowserVisible;
+            InputMapEditorVisible = loaded.InputMapEditorVisible;
             LastProjectPath = loaded.LastProjectPath;
             AssetBrowserSplitterDistance = loaded.AssetBrowserSplitterDistance;
+            BehaviourSectionCollapsed.Clear();
+            foreach (System.Collections.Generic.KeyValuePair<string, bool> kv in loaded.BehaviourSectionCollapsed)
+                BehaviourSectionCollapsed[kv.Key] = kv.Value;
             RecentProjects.Clear();
             RecentProjects.AddRange(loaded.RecentProjects);
         }

@@ -30,6 +30,7 @@ public sealed class CommandStack
     /// <summary>
     /// Executes <paramref name="command"/>, pushes it onto the undo history, and clears the redo stack.
     /// If history exceeds <see cref="MaxHistory"/>, the oldest entry is discarded.
+    /// Marks the active scene dirty when a scene is open.
     /// </summary>
     public void Execute(IEditorCommand command)
     {
@@ -38,6 +39,9 @@ public sealed class CommandStack
         _redoStack.Clear();
         if (_undoHistory.Count > MaxHistory)
             _undoHistory.RemoveFirst();
+
+        if (EditorContext.Instance.ActiveScene is not null)
+            EditorContext.Instance.MarkSceneDirty();
     }
 
     /// <summary>Undoes the most recent command and pushes it onto the redo stack.</summary>
